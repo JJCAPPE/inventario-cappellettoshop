@@ -26,6 +26,9 @@ fn main() {
             products::get_products,
             products::get_product_by_id,
             products::search_products,
+            products::search_products_by_sku,
+            products::search_products_enhanced,
+            products::find_product_by_exact_sku,
             
             // Inventory commands  
             inventory::get_inventory_levels,

@@ -84,6 +84,141 @@ pub async fn search_products(config: State<'_, AppConfig>, query: String) -> Res
     Ok(result)
 }
 
+/// Search products by SKU across all variants
+/// Since Shopify doesn't have a direct SKU search endpoint, we fetch all products and filter
+#[tauri::command]
+pub async fn search_products_by_sku(config: State<'_, AppConfig>, sku: String) -> Result<Vec<Product>, String> {
+    let client = reqwest::Client::new();
+    
+    // Shopify doesn't have direct SKU search, so we fetch all products and filter
+    let url = config.get_api_url("products.json?limit=250");
+    
+    let response = client
+        .get(&url)
+        .headers(config.get_headers())
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let data: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    let products = data["products"]
+        .as_array()
+        .ok_or("No products found")?;
+
+    let mut result = Vec::new();
+    
+    // Filter products that have variants matching the SKU
+    for product in products {
+        if let Some(variants) = product["variants"].as_array() {
+            let has_matching_sku = variants.iter().any(|variant| {
+                if let Some(variant_sku) = variant["sku"].as_str() {
+                    variant_sku.to_lowercase().contains(&sku.to_lowercase())
+                } else {
+                    false
+                }
+            });
+            
+            if has_matching_sku {
+                let parsed_product = parse_product_from_json(product)?;
+                result.push(parsed_product);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Enhanced search that looks for both title and SKU matches
+#[tauri::command]
+pub async fn search_products_enhanced(config: State<'_, AppConfig>, query: String) -> Result<Vec<Product>, String> {
+    let client = reqwest::Client::new();
+    
+    // First try title search
+    let encoded_query = urlencoding::encode(&query);
+    let title_url = config.get_api_url(&format!("products.json?title={}&limit=250", encoded_query));
+    
+    let title_response = client
+        .get(&title_url)
+        .headers(config.get_headers())
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let title_data: Value = title_response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    let mut result = Vec::new();
+    let mut found_product_ids = std::collections::HashSet::new();
+
+    // Process title search results
+    if let Some(products) = title_data["products"].as_array() {
+        for product in products {
+            if let Ok(parsed_product) = parse_product_from_json(product) {
+                found_product_ids.insert(parsed_product.id.clone());
+                result.push(parsed_product);
+            }
+        }
+    }
+
+    // If no title matches or looking for more, also search by SKU
+    if result.len() < 10 {  // Only search SKU if we have few results
+        let sku_results = search_products_by_sku(config, query).await?;
+        
+        for product in sku_results {
+            // Avoid duplicates from title search
+            if !found_product_ids.contains(&product.id) {
+                result.push(product);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Find exact product by SKU - returns the first exact match
+#[tauri::command]
+pub async fn find_product_by_exact_sku(config: State<'_, AppConfig>, sku: String) -> Result<Option<Product>, String> {
+    let client = reqwest::Client::new();
+    let url = config.get_api_url("products.json?limit=250");
+    
+    let response = client
+        .get(&url)
+        .headers(config.get_headers())
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let data: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    let products = data["products"]
+        .as_array()
+        .ok_or("No products found")?;
+
+    // Look for exact SKU match
+    for product in products {
+        if let Some(variants) = product["variants"].as_array() {
+            for variant in variants {
+                if let Some(variant_sku) = variant["sku"].as_str() {
+                    if variant_sku.eq_ignore_ascii_case(&sku) {
+                        return Ok(Some(parse_product_from_json(product)?));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
 fn parse_product_from_json(product: &Value) -> Result<Product, String> {
     let id = product["id"]
         .as_u64()

@@ -1,6 +1,10 @@
 use inventario_cappellettoshop_lib::utils::{AppConfig, Product, ProductVariant, InventoryUpdate, StatusResponse};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::env;
+use std::time::Duration;
+use tokio::time::sleep;
+use inventario_cappellettoshop_lib::*;
 
 // ============================================================================
 // CONFIGURATION TESTS
@@ -47,7 +51,7 @@ fn test_config_api_url_generation() {
         github_token: "test-github-token".to_string(),
         github_owner: "test-owner".to_string(),
         github_repo: "test-repo".to_string(),
-        version: "2.2.0".to_string(),
+        version: "3.0.0".to_string(),
     };
     
     let url = config.get_api_url("products.json");
@@ -74,7 +78,7 @@ fn test_config_headers() {
         github_token: "test-github-token".to_string(),
         github_owner: "test-owner".to_string(),
         github_repo: "test-repo".to_string(),
-        version: "2.2.0".to_string(),
+        version: "3.0.0".to_string(),
     };
     
     let headers = config.get_headers();
@@ -262,7 +266,7 @@ fn setup_test_config() -> AppConfig {
         github_token: "test-github-token".to_string(),
         github_owner: "test-owner".to_string(),
         github_repo: "test-repo".to_string(),
-        version: "2.2.0".to_string(),
+        version: "3.0.0".to_string(),
     }
 }
 
@@ -409,7 +413,7 @@ fn test_config_validation() {
         github_token: "test-github-token".to_string(),
         github_owner: "test-owner".to_string(),
         github_repo: "test-repo".to_string(),
-        version: "2.2.0".to_string(),
+        version: "3.0.0".to_string(),
     };
     
     // Test that all fields are properly set
@@ -418,4 +422,145 @@ fn test_config_validation() {
     assert_eq!(config.api_version, "2025-01");
     assert_eq!(config.primary_location, "loc1");
     assert_eq!(config.secondary_location, "loc2");
+}
+
+// Test configuration constants
+const TEST_SHOPIFY_DOMAIN: &str = "test-store.myshopify.com";
+const TEST_ACCESS_TOKEN: &str = "test_token_123";
+const TEST_LOCATION_ID: &str = "12345";
+
+// Test data constants
+const TEST_PRODUCT_ID: &str = "123456789";
+const TEST_VARIANT_ID: &str = "987654321";
+const TEST_INVENTORY_ITEM_ID: &str = "456789123";
+
+#[derive(Debug)]
+struct TestProduct {
+    id: String,
+    title: String,
+    handle: String,
+    description: String,
+    vendor: String,
+    product_type: String,
+    created_at: String,
+    updated_at: String,
+    published_at: String,
+    template_suffix: Option<String>,
+    published_scope: String,
+    tags: String,
+    status: String,
+    admin_graphql_api_id: String,
+    variants: Vec<TestVariant>,
+    options: Vec<TestOption>,
+    images: Vec<TestImage>,
+    image: Option<TestImage>,
+}
+
+#[derive(Debug)]
+struct TestVariant {
+    id: String,
+    product_id: String,
+    title: String,
+    price: String,
+    sku: String,
+    position: i32,
+    inventory_policy: String,
+    compare_at_price: Option<String>,
+    fulfillment_service: String,
+    inventory_management: String,
+    option1: String,
+    option2: Option<String>,
+    option3: Option<String>,
+    created_at: String,
+    updated_at: String,
+    taxable: bool,
+    barcode: Option<String>,
+    grams: i32,
+    image_id: Option<String>,
+    weight: f64,
+    weight_unit: String,
+    inventory_item_id: String,
+    inventory_quantity: i32,
+    old_inventory_quantity: i32,
+    requires_shipping: bool,
+    admin_graphql_api_id: String,
+    version: String,
+}
+
+impl Default for TestVariant {
+    fn default() -> Self {
+        TestVariant {
+            id: TEST_VARIANT_ID.to_string(),
+            product_id: TEST_PRODUCT_ID.to_string(),
+            title: "Default Title".to_string(),
+            price: "10.00".to_string(),
+            sku: "TEST-SKU-001".to_string(),
+            position: 1,
+            inventory_policy: "deny".to_string(),
+            compare_at_price: None,
+            fulfillment_service: "manual".to_string(),
+            inventory_management: "shopify".to_string(),
+            option1: "Default".to_string(),
+            option2: None,
+            option3: None,
+            created_at: "2023-01-01T00:00:00Z".to_string(),
+            updated_at: "2023-01-01T00:00:00Z".to_string(),
+            taxable: true,
+            barcode: None,
+            grams: 100,
+            image_id: None,
+            weight: 0.1,
+            weight_unit: "kg".to_string(),
+            inventory_item_id: TEST_INVENTORY_ITEM_ID.to_string(),
+            inventory_quantity: 5,
+            old_inventory_quantity: 5,
+            requires_shipping: true,
+            admin_graphql_api_id: format!("gid://shopify/ProductVariant/{}", TEST_VARIANT_ID),
+            version: "3.0.0".to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct TestOption {
+    id: String,
+    product_id: String,
+    name: String,
+    position: i32,
+    values: Vec<String>,
+}
+
+#[derive(Debug)]
+struct TestImage {
+    id: String,
+    product_id: String,
+    position: i32,
+    created_at: String,
+    updated_at: String,
+    alt: Option<String>,
+    width: i32,
+    height: i32,
+    src: String,
+    variant_ids: Vec<String>,
+    admin_graphql_api_id: String,
+    version: String,
+}
+
+impl Default for TestImage {
+    fn default() -> Self {
+        TestImage {
+            id: "1234567890".to_string(),
+            product_id: TEST_PRODUCT_ID.to_string(),
+            position: 1,
+            created_at: "2023-01-01T00:00:00Z".to_string(),
+            updated_at: "2023-01-01T00:00:00Z".to_string(),
+            alt: Some("Test Product Image".to_string()),
+            width: 800,
+            height: 600,
+            src: "https://cdn.shopify.com/test-image.jpg".to_string(),
+            variant_ids: vec![TEST_VARIANT_ID.to_string()],
+            admin_graphql_api_id: "gid://shopify/ProductImage/1234567890".to_string(),
+            version: "3.0.0".to_string(),
+        }
+    }
 } 
