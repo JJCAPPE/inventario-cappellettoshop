@@ -116,7 +116,7 @@ GITHUB_OWNER=your-github-username
 GITHUB_REPO=your-repo-name
 
 # App Version
-VERSION=2.2.0
+VERSION=3.0.0
 ```
 
 2. Run integration tests:

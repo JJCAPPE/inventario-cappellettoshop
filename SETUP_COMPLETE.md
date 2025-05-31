@@ -8,7 +8,7 @@
 - **Store Locations**: Treviso (3708157983) and Mogliano (31985336425) 
 - **Firebase**: Complete Firebase configuration for logging
 - **GitHub**: Auto-updater credentials for releases
-- **App Version**: 2.2.0
+- **App Version**: 3.0.0
 
 ### 2. **Backend Configuration Updated**
 ✅ Enhanced `AppConfig` structure to include:

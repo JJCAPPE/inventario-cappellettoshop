@@ -174,7 +174,7 @@ fn test_dry_run_all_functions() {
         github_token: "test-github-token".to_string(),
         github_owner: "test-owner".to_string(),
         github_repo: "test-repo".to_string(),
-        version: "2.2.0".to_string(),
+        version: "3.0.0".to_string(),
     };
     
     // Test URL generation for all endpoints

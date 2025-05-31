@@ -117,7 +117,7 @@ impl AppConfig {
 
         // App Configuration
         let version = std::env::var("VERSION")
-            .unwrap_or_else(|_| "2.2.0".to_string());
+            .unwrap_or_else(|_| "3.0.0".to_string());
 
         Ok(AppConfig {
             shop_domain,
