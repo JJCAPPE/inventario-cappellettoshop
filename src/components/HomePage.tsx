@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Card,
-  Input,
   Button,
   Space,
   Row,
@@ -16,9 +15,9 @@ import {
   Collapse,
   Typography,
   Radio,
+  Switch,
 } from "antd";
 import {
-  SearchOutlined,
   ReloadOutlined,
   ShopOutlined,
   ExclamationCircleOutlined,
@@ -41,7 +40,6 @@ const version = import.meta.env.VITE_VERSION || "3.0.0";
 const HomePage: React.FC = () => {
   const { fetchLogs, addLog } = useLogs();
   const [query, setQuery] = useState("");
-  const [skuInput, setSkuInput] = useState("");
   const [productDetails, setProductDetails] = useState<ProductDetails | null>(
     null
   );
@@ -52,10 +50,11 @@ const HomePage: React.FC = () => {
   const [secondaryLocation, setSecondaryLocation] =
     useState<string>("Mogliano");
   const [lastSelectedQuery, setLastSelectedQuery] = useState<string>("");
-  const [loading, setLoading] = useState(false);
   const [modifyModalVisible, setModifyModalVisible] = useState(false);
   const [undoModalVisible, setUndoModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [searchSortKey, setSearchSortKey] = useState<string>("RELEVANCE");
+  const [searchSortReverse, setSearchSortReverse] = useState<boolean>(false);
 
   // Legacy variables for backward compatibility
   const negozio = primaryLocation;
@@ -72,6 +71,23 @@ const HomePage: React.FC = () => {
       setSecondaryLocation(
         savedLocation === "Treviso" ? "Mogliano" : "Treviso"
       );
+    }
+
+    // Load saved search sort preference from localStorage
+    const savedSortKey = localStorage.getItem("searchSortKey");
+    if (
+      savedSortKey &&
+      ["RELEVANCE", "UPDATED_AT", "CREATED_AT", "INVENTORY_TOTAL"].includes(
+        savedSortKey
+      )
+    ) {
+      setSearchSortKey(savedSortKey);
+    }
+
+    // Load saved search sort reverse preference from localStorage
+    const savedSortReverse = localStorage.getItem("searchSortReverse");
+    if (savedSortReverse !== null) {
+      setSearchSortReverse(savedSortReverse === "true");
     }
 
     // Add keyboard shortcut listener for Cmd+, (settings)
@@ -116,13 +132,42 @@ const HomePage: React.FC = () => {
     message.success(`Posizione principale cambiata a ${newPrimaryLocation}`);
   };
 
+  const handleSearchSortChange = (newSortKey: string) => {
+    setSearchSortKey(newSortKey);
+
+    // Save to localStorage
+    localStorage.setItem("searchSortKey", newSortKey);
+
+    const sortLabels = {
+      RELEVANCE: "Rilevanza",
+      UPDATED_AT: "Aggiornati Recentemente",
+      CREATED_AT: "Creati Recentemente",
+      INVENTORY_TOTAL: "Quantità Totale",
+    };
+
+    message.success(
+      `Ordine Risultati Ricerca: ${
+        sortLabels[newSortKey as keyof typeof sortLabels]
+      }`
+    );
+  };
+
+  const handleSearchSortReverseChange = (reverse: boolean) => {
+    setSearchSortReverse(reverse);
+
+    // Save to localStorage
+    localStorage.setItem("searchSortReverse", reverse.toString());
+
+    const orderText = reverse ? "Decrescente" : "Crescente";
+    message.success(`Ordine risultati: ${orderText}`);
+  };
+
   const handleSettingsOk = () => {
     setSettingsModalVisible(false);
   };
 
   const handleSearchSelect = async (id: string, searchQuery: string) => {
     setLastSelectedQuery(searchQuery);
-    setLoading(true);
 
     try {
       console.log("🚀 HomePage: Starting product fetch for ID:", id);
@@ -198,57 +243,44 @@ const HomePage: React.FC = () => {
       setProductDetails(productDetails);
       setSecondaryProductDetails(secondaryDetails);
       console.log("✅ HomePage: Product data set successfully");
-    } catch (error) {
-      console.error("❌ HomePage: Error fetching product:", error);
-      message.error("Prodotto non trovato, prova un altro barcode");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleSkuSubmit = async () => {
-    if (!skuInput) return;
+      // Auto-select variant if search was by SKU
+      if (searchQuery && searchQuery.trim()) {
+        console.log("🔍 HomePage: Checking if search was by SKU:", searchQuery);
 
-    setLoading(true);
-    try {
-      console.log("🚀 HomePage: Starting SKU search for:", skuInput);
-
-      // Use exact SKU search first
-      const exactProduct = await TauriAPI.Product.findProductByExactSku(
-        skuInput
-      );
-
-      if (exactProduct) {
-        console.log(
-          "✅ HomePage: Found exact SKU match, using product:",
-          exactProduct.title
-        );
-        // Found exact match, use it directly
-        await handleSearchSelect(exactProduct.id, skuInput);
-      } else {
-        console.log(
-          "⚠️ HomePage: No exact SKU match, trying partial search..."
-        );
-        // Try partial SKU search
-        const products = await TauriAPI.Product.searchProductsBySku(skuInput);
-
-        if (products.length > 0) {
-          console.log(
-            `✅ HomePage: Found ${products.length} partial SKU matches, using first:`,
-            products[0].title
+        // Check if the search query matches any variant's actual SKU from the backend
+        const skuMatchingVariant = product.variants.find((backendVariant) => {
+          return (
+            backendVariant.sku &&
+            backendVariant.sku.toLowerCase() === searchQuery.toLowerCase()
           );
-          // Use first result from partial search
-          await handleSearchSelect(products[0].id, skuInput);
+        });
+
+        if (skuMatchingVariant) {
+          // Find the corresponding frontend variant by inventory_item_id
+          const frontendVariant = productDetails.varaintiArticolo.find(
+            (v) => v.inventory_item_id === skuMatchingVariant.inventory_item_id
+          );
+
+          if (frontendVariant && frontendVariant.inventory_quantity > 0) {
+            console.log(
+              "✅ HomePage: Auto-selecting variant with matching SKU:",
+              frontendVariant.title
+            );
+            setSelectedVariant(frontendVariant.title);
+          } else if (frontendVariant) {
+            console.log(
+              "⚠️ HomePage: Found SKU variant but it has zero inventory:",
+              frontendVariant.title
+            );
+          }
         } else {
-          console.log("❌ HomePage: No products found with SKU:", skuInput);
-          throw new Error("No products found with this SKU");
+          console.log("ℹ️ HomePage: No exact SKU match found in variants");
         }
       }
     } catch (error) {
-      console.error("❌ HomePage: Error searching by SKU:", error);
-      message.error("SKU non trovato");
-    } finally {
-      setLoading(false);
+      console.error("❌ HomePage: Error fetching product:", error);
+      message.error("Prodotto non trovato, prova un altro barcode");
     }
   };
 
@@ -278,24 +310,63 @@ const HomePage: React.FC = () => {
       cancelText: "Annulla",
       onOk: async () => {
         try {
-          // TODO: Implement actual inventory decrease when backend is ready
-          console.log("Decreasing inventory for variant:", selectedVariant);
+          // Get the variant details
+          const variant = productDetails.varaintiArticolo.find(
+            (v) => v.title === selectedVariant
+          );
 
-          // Mock success
-          setModifyModalVisible(true);
+          if (!variant) {
+            throw new Error("Variante non trovata");
+          }
 
-          // Add log entry
+          console.log(
+            "🔄 Starting inventory decrease for variant:",
+            selectedVariant
+          );
+          console.log("📦 Inventory item ID:", variant.inventory_item_id);
+          console.log("🏪 Primary location:", primaryLocation);
+
+          // Get location configuration to map location name to ID
+          const locationConfig = await TauriAPI.Inventory.getLocationConfig();
+          console.log("📍 Location config:", locationConfig);
+
+          // Determine the correct location ID based on primary location
+          const locationId =
+            primaryLocation === "Treviso"
+              ? locationConfig.primary_location.id
+              : locationConfig.secondary_location.id;
+
+          console.log(
+            "📍 Using location ID:",
+            locationId,
+            "for",
+            primaryLocation
+          );
+
+          // Prepare inventory update (decrease by 1)
+          const inventoryUpdate = {
+            variant_id: variant.inventory_item_id,
+            location_id: locationId,
+            adjustment: -1,
+          };
+
+          console.log("📝 Inventory update:", inventoryUpdate);
+
+          // Perform the inventory adjustment
+          const result = await TauriAPI.Inventory.adjustInventory([
+            inventoryUpdate,
+          ]);
+          console.log("✅ Inventory adjustment successful:", result);
+
+          // Add log entry for successful operation
           const logEntry = {
             requestType: "Rettifica",
             timestamp: new Date().toISOString(),
             data: {
               id: productDetails.id,
               variant: selectedVariant,
-              negozio: negozio,
-              inventory_item_id:
-                productDetails.varaintiArticolo.find(
-                  (v) => v.title === selectedVariant
-                )?.inventory_item_id || "",
+              negozio: primaryLocation,
+              inventory_item_id: variant.inventory_item_id,
               nome: productDetails.nomeArticolo,
               prezzo: productDetails.prezzo,
               rettifica: -1,
@@ -304,10 +375,27 @@ const HomePage: React.FC = () => {
           };
 
           addLog(logEntry);
-          fetchLogs();
+          await fetchLogs();
+
+          // Refresh product data to show updated inventory
+          console.log("🔄 Refreshing product data...");
+          await handleSearchSelect(
+            productDetails.id,
+            lastSelectedQuery || productDetails.nomeArticolo
+          );
+
+          // Show success modal
+          setModifyModalVisible(true);
+          message.success(
+            `Inventario diminuito con successo per ${selectedVariant}`
+          );
         } catch (error) {
-          console.error("Error decreasing inventory:", error);
-          message.error("Errore nella modifica del prodotto");
+          console.error("❌ Error decreasing inventory:", error);
+          message.error(
+            `Errore nella modifica del prodotto: ${
+              error instanceof Error ? error.message : "Errore sconosciuto"
+            }`
+          );
         }
       },
     });
@@ -317,10 +405,45 @@ const HomePage: React.FC = () => {
     if (!selectedVariant || !productDetails) return;
 
     try {
-      // TODO: Implement actual undo when backend is ready
-      console.log("Undoing change for variant:", selectedVariant);
+      // Get the variant details
+      const variant = productDetails.varaintiArticolo.find(
+        (v) => v.title === selectedVariant
+      );
 
-      setUndoModalVisible(true);
+      if (!variant) {
+        throw new Error("Variante non trovata");
+      }
+
+      console.log("🔄 Starting inventory undo for variant:", selectedVariant);
+      console.log("📦 Inventory item ID:", variant.inventory_item_id);
+      console.log("🏪 Primary location:", primaryLocation);
+
+      // Get location configuration to map location name to ID
+      const locationConfig = await TauriAPI.Inventory.getLocationConfig();
+      console.log("📍 Location config:", locationConfig);
+
+      // Determine the correct location ID based on primary location
+      const locationId =
+        primaryLocation === "Treviso"
+          ? locationConfig.primary_location.id
+          : locationConfig.secondary_location.id;
+
+      console.log("📍 Using location ID:", locationId, "for", primaryLocation);
+
+      // Prepare inventory update (increase by 1 to undo)
+      const inventoryUpdate = {
+        variant_id: variant.inventory_item_id,
+        location_id: locationId,
+        adjustment: +1,
+      };
+
+      console.log("📝 Inventory undo update:", inventoryUpdate);
+
+      // Perform the inventory adjustment
+      const result = await TauriAPI.Inventory.adjustInventory([
+        inventoryUpdate,
+      ]);
+      console.log("✅ Inventory undo successful:", result);
 
       // Add undo log entry
       const logEntry = {
@@ -329,23 +452,37 @@ const HomePage: React.FC = () => {
         data: {
           id: productDetails.id,
           variant: selectedVariant,
-          negozio: negozio,
-          inventory_item_id:
-            productDetails.varaintiArticolo.find(
-              (v) => v.title === selectedVariant
-            )?.inventory_item_id || "",
+          negozio: primaryLocation,
+          inventory_item_id: variant.inventory_item_id,
           nome: productDetails.nomeArticolo,
           prezzo: productDetails.prezzo,
-          rettifica: 1,
+          rettifica: +1,
           images: productDetails.immaginiArticolo,
         },
       };
 
       addLog(logEntry);
-      fetchLogs();
+      await fetchLogs();
+
+      // Refresh product data to show updated inventory
+      console.log("🔄 Refreshing product data...");
+      await handleSearchSelect(
+        productDetails.id,
+        lastSelectedQuery || productDetails.nomeArticolo
+      );
+
+      // Show success modal
+      setUndoModalVisible(true);
+      message.success(
+        `Annullamento completato con successo per ${selectedVariant}`
+      );
     } catch (error) {
-      console.error("Error undoing change:", error);
-      message.error("Errore nell'annullamento");
+      console.error("❌ Error undoing change:", error);
+      message.error(
+        `Errore nell'annullamento: ${
+          error instanceof Error ? error.message : "Errore sconosciuto"
+        }`
+      );
     }
   };
 
@@ -380,17 +517,13 @@ const HomePage: React.FC = () => {
   };
 
   const handleReset = () => {
-    setSkuInput("");
+    setQuery("");
     setProductDetails(null);
     setSecondaryProductDetails(null);
     setSelectedVariant(null);
     setLastSelectedQuery("");
     setModifyModalVisible(false);
     setUndoModalVisible(false);
-  };
-
-  const handleReinsertSearchQuery = () => {
-    setQuery(lastSelectedQuery);
   };
 
   return (
@@ -402,48 +535,36 @@ const HomePage: React.FC = () => {
       </Row>
 
       <Row gutter={24} style={{ marginBottom: 24 }}>
-        <Col span={8}>
+        <Col span={18} offset={3}>
           <Space direction="vertical" style={{ width: "100%" }}>
-            <Input
-              size="large"
-              placeholder="Inserisci SKU..."
-              value={skuInput}
-              onChange={(e) => setSkuInput(e.target.value)}
-              onPressEnter={handleSkuSubmit}
-              prefix={<SearchOutlined />}
-              style={{ height: "37px" }}
-            />
-            <Space>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ flex: 1 }}>
+                <SearchBar
+                  query={query}
+                  setQuery={setQuery}
+                  onSelect={handleSearchSelect}
+                  onAutoSelect={handleSearchSelect}
+                  sortKey={searchSortKey}
+                  sortReverse={searchSortReverse}
+                />
+              </div>
+
               <Button
-                type="primary"
-                size="large"
-                onClick={handleSkuSubmit}
-                loading={loading}
-              >
-                Cerca SKU
-              </Button>
-              <Button
+                type="text"
                 size="large"
                 icon={<ReloadOutlined />}
                 onClick={handleReset}
-              >
-                Reset
-              </Button>
-            </Space>
-          </Space>
-        </Col>
-        <Col span={16}>
-          <Space direction="vertical" style={{ width: "100%" }}>
-            <SearchBar
-              query={query}
-              setQuery={setQuery}
-              onSelect={handleSearchSelect}
-            />
-            {lastSelectedQuery && (
-              <Button type="dashed" onClick={handleReinsertSearchQuery}>
-                ^ "{lastSelectedQuery}"
-              </Button>
-            )}
+                style={{
+                  color: "#999",
+                  border: "none",
+                  boxShadow: "none",
+                  minWidth: "37px",
+                  height: "37px",
+                  padding: 0,
+                }}
+                title="Reset ricerca"
+              />
+            </div>
           </Space>
         </Col>
       </Row>
@@ -700,8 +821,8 @@ const HomePage: React.FC = () => {
       >
         <div style={{ textAlign: "center" }}>
           <p>
-            Taglia <Text mark>{selectedVariant}</Text> dell'articolo{" "}
-            <Text mark>{productDetails?.nomeArticolo}</Text> è stata rimossa
+            Taglia <Text strong>{selectedVariant}</Text> dell'articolo{" "}
+            <Text strong>{productDetails?.nomeArticolo}</Text> è stata rimossa
           </p>
           <Space>
             <Button
@@ -728,8 +849,9 @@ const HomePage: React.FC = () => {
       >
         <div style={{ textAlign: "center" }}>
           <p>
-            Taglia <Text mark>{selectedVariant}</Text> dell'articolo{" "}
-            <Text mark>{productDetails?.nomeArticolo}</Text> è stata re-inserita
+            Taglia <Text strong>{selectedVariant}</Text> dell'articolo{" "}
+            <Text strong>{productDetails?.nomeArticolo}</Text> è stata
+            re-inserita
           </p>
           <Button type="primary" icon={<CloseOutlined />} onClick={handleReset}>
             Chiudi
@@ -750,7 +872,7 @@ const HomePage: React.FC = () => {
         onCancel={() => setSettingsModalVisible(false)}
         okText="Salva"
         cancelText="Annulla"
-        width={400}
+        width={500}
       >
         <div style={{ padding: "16px 0" }}>
           <Title level={5}>Posizione Principale</Title>
@@ -792,6 +914,69 @@ const HomePage: React.FC = () => {
               </Radio>
             </Space>
           </Radio.Group>
+
+          <Divider />
+
+          <Title level={5}>Ordinamento Risultati Ricerca</Title>
+          <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
+            Scegli come ordinare i risultati quando cerchi prodotti per nome.
+          </Text>
+
+          <Radio.Group
+            value={searchSortKey}
+            onChange={(e) => handleSearchSortChange(e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <Space direction="vertical" style={{ width: "100%" }}>
+              <Radio
+                value="RELEVANCE"
+                style={{ fontSize: 16, padding: "8px 0" }}
+              >
+                <Space>
+                  <span>Rilevanza</span>
+                  <Tag color="default">Predefinito</Tag>
+                </Space>
+              </Radio>
+              <Radio
+                value="UPDATED_AT"
+                style={{ fontSize: 16, padding: "8px 0" }}
+              >
+                <span>Aggiornati di recente</span>
+              </Radio>
+              <Radio
+                value="CREATED_AT"
+                style={{ fontSize: 16, padding: "8px 0" }}
+              >
+                <span>Più recenti</span>
+              </Radio>
+              <Radio
+                value="INVENTORY_TOTAL"
+                style={{ fontSize: 16, padding: "8px 0" }}
+              >
+                <span>Inventario totale</span>
+              </Radio>
+            </Space>
+          </Radio.Group>
+
+          <div style={{ marginTop: 18 }}>
+            <Space style={{ width: "100%", justifyContent: "space-between" }}>
+              <div>
+                <Text strong>Ordine Invertito</Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {searchSortReverse
+                    ? "Dal più alto al più basso"
+                    : "Dal più basso al più alto"}
+                </Text>
+              </div>
+              <Switch
+                checked={searchSortReverse}
+                onChange={handleSearchSortReverseChange}
+                checkedChildren="↓"
+                unCheckedChildren="↑"
+              />
+            </Space>
+          </div>
 
           <Divider />
 

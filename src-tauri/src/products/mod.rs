@@ -166,7 +166,7 @@ pub async fn search_products_enhanced(config: State<'_, AppConfig>, query: Strin
 
     // First try GraphQL-based partial title search (much better than REST)
     println!("🔍 Phase 1: GraphQL title search with partial matching");
-    match search_products_by_name_graphql(config.clone(), query.clone()).await {
+    match search_products_by_name_graphql(config.clone(), query.clone(), None, None).await {
         Ok(graphql_products) => {
             println!("✅ GraphQL search returned {} products", graphql_products.len());
             for product in graphql_products {
@@ -371,16 +371,25 @@ fn parse_product_from_json(product: &Value) -> Result<Product, String> {
 
 /// Search products by partial name using GraphQL (more flexible than REST)
 #[tauri::command]
-pub async fn search_products_by_name_graphql(config: State<'_, AppConfig>, name: String) -> Result<Vec<Product>, String> {
+pub async fn search_products_by_name_graphql(
+    config: State<'_, AppConfig>, 
+    name: String, 
+    sort_key: Option<String>,
+    sort_reverse: Option<bool>
+) -> Result<Vec<Product>, String> {
     let client = reqwest::Client::new();
     let graphql_url = format!("https://{}/admin/api/{}/graphql.json", 
         config.shop_domain, config.api_version);
     
-    // Use GraphQL with wildcard for partial matching
+    // Use the provided sort key or default to RELEVANCE
+    let sort_key = sort_key.unwrap_or_else(|| "RELEVANCE".to_string());
+    let sort_reverse = sort_reverse.unwrap_or(false);
+    
+    // Build the GraphQL query with wildcard for partial matching, sorting, and reverse option
     let query = format!(
         r#"
         {{
-            products(first: 20, query: "title:{}* status:active") {{
+            products(first: 40, query: "title:{}* status:active", sortKey: {}, reverse: {}) {{
                 edges {{
                     node {{
                         id
@@ -418,10 +427,12 @@ pub async fn search_products_by_name_graphql(config: State<'_, AppConfig>, name:
             }}
         }}
         "#,
-        name.replace("\"", "\\\"") // Escape quotes in search term
+        name.replace("\"", "\\\""), // Escape quotes in search term
+        sort_key,
+        sort_reverse
     );
 
-    println!("🔍 GraphQL Search for name: '{}'", name);
+    println!("🔍 GraphQL Search for name: '{}' with sort key: '{}', reverse: {}", name, sort_key, sort_reverse);
     println!("📋 GraphQL Query: {}", query);
 
     let payload = json!({

@@ -91,14 +91,24 @@ export class ProductAPI {
   /**
    * Search products by partial name using GraphQL (better partial matching)
    */
-  static async searchProductsByNameGraphQL(name: string): Promise<Product[]> {
+  static async searchProductsByNameGraphQL(
+    name: string,
+    sortKey?: string,
+    sortReverse?: boolean
+  ): Promise<Product[]> {
     try {
       const result = await invoke<Product[]>(
         "search_products_by_name_graphql",
-        { name }
+        {
+          name,
+          sortKey: sortKey || "RELEVANCE",
+          sortReverse: sortReverse || false,
+        }
       );
       console.log(
-        `🔍 Raw API Response - search_products_by_name_graphql (${name}):`,
+        `🔍 Raw API Response - search_products_by_name_graphql (${name}, sort: ${
+          sortKey || "RELEVANCE"
+        }, reverse: ${sortReverse || false}):`,
         result
       );
       console.log(

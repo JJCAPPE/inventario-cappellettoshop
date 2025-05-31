@@ -49,3 +49,26 @@
 .sidebar-content::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
 }
+
+
+/* Search Dropdown Customization */
+
+.search-dropdown-large .ant-select-dropdown {
+    max-height: 600px !important;
+    min-height: 200px !important;
+    overflow-y: auto !important;
+}
+
+.search-dropdown-large .rc-virtual-list {
+    max-height: 600px !important;
+    min-height: 200px !important;
+}
+
+.search-dropdown-large .ant-select-item {
+    padding: 4px 12px !important;
+}
+
+.search-dropdown-large .rc-virtual-list-holder {
+    max-height: 600px !important;
+    min-height: 200px !important;
+}

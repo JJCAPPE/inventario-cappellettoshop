@@ -7,44 +7,131 @@ interface SearchBarProps {
   query: string;
   setQuery: (query: string) => void;
   onSelect: (id: string, query: string) => void;
+  onAutoSelect?: (id: string, query: string) => void;
+  sortKey?: string;
+  sortReverse?: boolean;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
+const SearchBar: React.FC<SearchBarProps> = ({
+  query,
+  setQuery,
+  onSelect,
+  onAutoSelect,
+  sortKey = "RELEVANCE",
+  sortReverse = false,
+}) => {
   const [options, setOptions] = useState<
     Array<{ value: string; label: React.ReactNode }>
   >([]);
   const [loading, setLoading] = useState(false);
+  const [searchStatus, setSearchStatus] = useState<"" | "warning" | "error">(
+    ""
+  );
 
   const searchProducts = async (searchQuery: string) => {
     if (!searchQuery || searchQuery.length < 2) {
       setOptions([]);
+      setSearchStatus("");
       return;
     }
 
     setLoading(true);
+    setSearchStatus(""); // Reset status while searching
     try {
-      console.log("🚀 SearchBar: Starting enhanced search for:", searchQuery);
+      console.log("🚀 SearchBar: Starting unified search for:", searchQuery);
 
-      // Use enhanced search that looks for both title and SKU matches
-      const products = await TauriAPI.Product.searchProductsEnhanced(
+      // First, try exact SKU search if the query looks like it could be a SKU
+      let skuProduct = null;
+      if (searchQuery.trim()) {
+        try {
+          console.log(
+            "🏷️ SearchBar: Trying exact SKU search for:",
+            searchQuery
+          );
+          skuProduct = await TauriAPI.Product.findProductByExactSku(
+            searchQuery.trim()
+          );
+
+          if (skuProduct) {
+            console.log(
+              "✅ SearchBar: Found exact SKU match:",
+              skuProduct.title
+            );
+            // Auto-select the SKU match
+            if (onAutoSelect) {
+              onAutoSelect(skuProduct.id, searchQuery);
+              setOptions([]);
+              return;
+            }
+          }
+        } catch (error) {
+          console.log(
+            "⚠️ SearchBar: No exact SKU match found, continuing with GraphQL search"
+          );
+        }
+      }
+
+      // If no SKU match found, do GraphQL search for product names
+      console.log(
+        "🔍 SearchBar: Performing GraphQL title search for:",
         searchQuery
       );
       console.log(
-        `✅ SearchBar: Received ${products.length} products from search`
+        "📊 SearchBar: Using sort key:",
+        sortKey,
+        "reverse:",
+        sortReverse
+      );
+      const products = await TauriAPI.Product.searchProductsByNameGraphQL(
+        searchQuery,
+        sortKey,
+        sortReverse
+      );
+      console.log(
+        `✅ SearchBar: GraphQL search returned ${products.length} products`
       );
 
-      const searchOptions = products.map((product) => ({
+      // If GraphQL didn't return enough results, also try enhanced search as fallback
+      let allProducts = products;
+      if (products.length < 10) {
+        try {
+          console.log(
+            "🔄 SearchBar: Adding enhanced search results as fallback"
+          );
+          const enhancedProducts =
+            await TauriAPI.Product.searchProductsEnhanced(searchQuery);
+
+          // Combine and deduplicate results
+          const existingIds = new Set(products.map((p) => p.id));
+          const newProducts = enhancedProducts.filter(
+            (p) => !existingIds.has(p.id)
+          );
+          allProducts = [...products, ...newProducts];
+
+          console.log(
+            `📊 SearchBar: Combined search returned ${allProducts.length} total products`
+          );
+        } catch (error) {
+          console.log(
+            "⚠️ SearchBar: Enhanced search fallback failed, using GraphQL results only"
+          );
+        }
+      }
+
+      const searchOptions = allProducts.map((product) => ({
         value: product.id,
         label: (
-          <div style={{ display: "flex", alignItems: "center" }}>
+          <div
+            style={{ display: "flex", alignItems: "center", padding: "4px 0" }}
+          >
             {product.images && product.images.length > 0 ? (
               <img
                 src={product.images[0]}
                 alt={product.title}
                 style={{
-                  width: 40,
-                  height: 40,
-                  marginRight: 12,
+                  width: 32,
+                  height: 32,
+                  marginRight: 8,
                   borderRadius: 4,
                   objectFit: "cover",
                 }}
@@ -54,39 +141,43 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
                     "🖼️ SearchBar: Image failed to load, using placeholder for:",
                     product.title
                   );
-                  e.currentTarget.src = "https://via.placeholder.com/40";
+                  e.currentTarget.src = "https://via.placeholder.com/32";
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: 40,
-                  height: 40,
-                  marginRight: 12,
+                  width: 32,
+                  height: 32,
+                  marginRight: 8,
                   borderRadius: 4,
                   backgroundColor: "#f0f0f0",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "12px",
+                  fontSize: "10px",
                   color: "#999",
                 }}
               >
                 IMG
               </div>
             )}
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 500, marginBottom: 2 }}>
+            <div style={{ flex: 1, lineHeight: 1.3 }}>
+              <div
+                style={{ fontWeight: 500, marginBottom: 1, fontSize: "14px" }}
+              >
                 {product.title}
               </div>
               {product.variants &&
                 product.variants.length > 0 &&
                 product.variants[0].sku && (
-                  <div style={{ fontSize: "12px", color: "#666" }}>
+                  <div
+                    style={{ fontSize: "11px", color: "#666", marginBottom: 1 }}
+                  >
                     SKU: {product.variants[0].sku}
                   </div>
                 )}
-              <div style={{ fontSize: "12px", color: "#999" }}>
+              <div style={{ fontSize: "11px", color: "#999" }}>
                 €{product.price} • {product.total_inventory} in stock
               </div>
             </div>
@@ -97,10 +188,34 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
       console.log(
         `📋 SearchBar: Created ${searchOptions.length} search options`
       );
-      setOptions(searchOptions);
+
+      // Set status based on results
+      if (searchOptions.length === 0) {
+        setSearchStatus("warning");
+        // Add a "no results" option to show user feedback
+        const noResultsOption = {
+          value: "no-results",
+          label: (
+            <div
+              style={{
+                color: "#faad14",
+                padding: "8px 12px",
+                textAlign: "center",
+                fontStyle: "italic",
+              }}
+            >
+              Nessun risultato trovato per "{searchQuery}"
+            </div>
+          ),
+        };
+        setOptions([noResultsOption]);
+      } else {
+        setSearchStatus("");
+        setOptions(searchOptions);
+      }
     } catch (error) {
       console.error("❌ SearchBar: Error searching products:", error);
-      setOptions([]);
+      setSearchStatus("error");
 
       // Show user-friendly error in development mode
       if (import.meta.env.DEV) {
@@ -113,6 +228,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
           ),
         };
         setOptions([errorOption]);
+      } else {
+        setOptions([]);
       }
     } finally {
       setLoading(false);
@@ -131,8 +248,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
   }, [query]);
 
   const handleSelect = (value: string) => {
-    // Don't handle error selections
-    if (value === "error") return;
+    // Don't handle error or no-results selections
+    if (value === "error" || value === "no-results") return;
 
     console.log("🎯 SearchBar: Product selected with ID:", value);
     const selectedOption = options.find((option) => option.value === value);
@@ -149,12 +266,22 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
       onSelect={handleSelect}
       onSearch={setQuery}
       value={query}
+      listHeight={600}
+      dropdownMatchSelectWidth={true}
+      dropdownStyle={{
+        maxHeight: "600px",
+        minHeight: "200px",
+        overflowY: "auto",
+        zIndex: 1050,
+      }}
+      popupClassName="search-dropdown-large"
     >
       <Input
         size="large"
         prefix={<SearchOutlined />}
         suffix={loading ? <Spin size="small" /> : null}
-        placeholder="Cerca prodotti per nome o SKU..."
+        placeholder="Cerca per nome prodotto o inserisci SKU per selezione automatica..."
+        status={searchStatus}
       />
     </AutoComplete>
   );
