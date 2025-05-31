@@ -23,11 +23,14 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
 
     setLoading(true);
     try {
-      console.log("Searching for:", searchQuery);
+      console.log("🚀 SearchBar: Starting enhanced search for:", searchQuery);
 
       // Use enhanced search that looks for both title and SKU matches
       const products = await TauriAPI.Product.searchProductsEnhanced(
         searchQuery
+      );
+      console.log(
+        `✅ SearchBar: Received ${products.length} products from search`
       );
 
       const searchOptions = products.map((product) => ({
@@ -47,6 +50,10 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
                 }}
                 onError={(e) => {
                   // Fallback to placeholder if image fails to load
+                  console.log(
+                    "🖼️ SearchBar: Image failed to load, using placeholder for:",
+                    product.title
+                  );
                   e.currentTarget.src = "https://via.placeholder.com/40";
                 }}
               />
@@ -87,9 +94,12 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
         ),
       }));
 
+      console.log(
+        `📋 SearchBar: Created ${searchOptions.length} search options`
+      );
       setOptions(searchOptions);
     } catch (error) {
-      console.error("Error searching products:", error);
+      console.error("❌ SearchBar: Error searching products:", error);
       setOptions([]);
 
       // Show user-friendly error in development mode
@@ -111,6 +121,9 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
+      if (query) {
+        console.log(`⏰ SearchBar: Debounced search triggered for: "${query}"`);
+      }
       searchProducts(query);
     }, 300);
 
@@ -121,8 +134,10 @@ const SearchBar: React.FC<SearchBarProps> = ({ query, setQuery, onSelect }) => {
     // Don't handle error selections
     if (value === "error") return;
 
+    console.log("🎯 SearchBar: Product selected with ID:", value);
     const selectedOption = options.find((option) => option.value === value);
     if (selectedOption) {
+      console.log("✅ SearchBar: Calling onSelect with query:", query);
       onSelect(value, query);
     }
   };

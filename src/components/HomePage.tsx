@@ -15,6 +15,7 @@ import {
   Badge,
   Collapse,
   Typography,
+  Radio,
 } from "antd";
 import {
   SearchOutlined,
@@ -23,7 +24,10 @@ import {
   ExclamationCircleOutlined,
   UndoOutlined,
   CloseOutlined,
+  SettingOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import SearchBar from "./SearchBar";
 import { ProductDetails, SecondaryDetails } from "../types";
 import { useLogs } from "../contexts/LogContext";
@@ -44,29 +48,118 @@ const HomePage: React.FC = () => {
   const [secondaryProductDetails, setSecondaryProductDetails] =
     useState<SecondaryDetails | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
-  const [negozio, setNegozio] = useState<string>("Treviso");
-  const [secondario, setSecondario] = useState<string>("Mogliano");
+  const [primaryLocation, setPrimaryLocation] = useState<string>("Treviso");
+  const [secondaryLocation, setSecondaryLocation] =
+    useState<string>("Mogliano");
   const [lastSelectedQuery, setLastSelectedQuery] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [modifyModalVisible, setModifyModalVisible] = useState(false);
   const [undoModalVisible, setUndoModalVisible] = useState(false);
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+
+  // Legacy variables for backward compatibility
+  const negozio = primaryLocation;
+  const secondario = secondaryLocation;
 
   useEffect(() => {
-    // TODO: Fetch location from backend when available
-    // Mock location setup for now
-    setNegozio("Treviso");
-    setSecondario("Mogliano");
+    // Load saved location preference from localStorage
+    const savedLocation = localStorage.getItem("primaryLocation");
+    if (
+      savedLocation &&
+      (savedLocation === "Treviso" || savedLocation === "Mogliano")
+    ) {
+      setPrimaryLocation(savedLocation);
+      setSecondaryLocation(
+        savedLocation === "Treviso" ? "Mogliano" : "Treviso"
+      );
+    }
+
+    // Add keyboard shortcut listener for Cmd+, (settings)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === ",") {
+        event.preventDefault();
+        setSettingsModalVisible(true);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
+
+  // Clear selected variant if it has zero inventory
+  useEffect(() => {
+    if (selectedVariant && productDetails) {
+      const variantObj = productDetails.varaintiArticolo.find(
+        (v) => v.title === selectedVariant
+      );
+
+      if (!variantObj || variantObj.inventory_quantity === 0) {
+        console.log(
+          `🚫 Clearing selected variant '${selectedVariant}' because it has zero inventory`
+        );
+        setSelectedVariant(null);
+      }
+    }
+  }, [productDetails, selectedVariant]);
+
+  const handleLocationChange = (newPrimaryLocation: string) => {
+    setPrimaryLocation(newPrimaryLocation);
+    setSecondaryLocation(
+      newPrimaryLocation === "Treviso" ? "Mogliano" : "Treviso"
+    );
+
+    // Save to localStorage
+    localStorage.setItem("primaryLocation", newPrimaryLocation);
+
+    message.success(`Posizione principale cambiata a ${newPrimaryLocation}`);
+  };
+
+  const handleSettingsOk = () => {
+    setSettingsModalVisible(false);
+  };
 
   const handleSearchSelect = async (id: string, searchQuery: string) => {
     setLastSelectedQuery(searchQuery);
     setLoading(true);
 
     try {
-      console.log("Fetching product with ID:", id);
+      console.log("🚀 HomePage: Starting product fetch for ID:", id);
+      console.log("🔍 Search query was:", searchQuery);
 
       // Fetch the actual product from Shopify using Tauri API
       const product = await TauriAPI.Product.getProductById(id);
+      console.log("✅ HomePage: Product fetched successfully:", product.title);
+
+      // Get inventory levels for all variants to show location-specific data
+      const inventoryItemIds = product.variants.map((v) => v.inventory_item_id);
+      console.log(
+        "📊 HomePage: Fetching inventory for items:",
+        inventoryItemIds
+      );
+
+      const inventoryLevels =
+        await TauriAPI.Inventory.getInventoryLevelsForLocations(
+          inventoryItemIds,
+          primaryLocation
+        );
+      console.log(
+        "✅ HomePage: Location-aware inventory levels received:",
+        inventoryLevels
+      );
+
+      // Update product variants with primary location inventory
+      const updatedVariants = product.variants.map((variant) => {
+        const inventoryData = inventoryLevels[variant.inventory_item_id] || {
+          primary: 0,
+          secondary: 0,
+        };
+        return {
+          ...variant,
+          inventory_quantity: inventoryData.primary, // Use primary location inventory
+        };
+      });
 
       // Convert Tauri Product to our ProductDetails format
       const productDetails: ProductDetails = {
@@ -75,7 +168,7 @@ const HomePage: React.FC = () => {
         prezzo: product.price,
         descrizioneArticolo: product.description || "",
         immaginiArticolo: product.images || [],
-        varaintiArticolo: product.variants.map((variant) => ({
+        varaintiArticolo: updatedVariants.map((variant) => ({
           inventory_item_id: variant.inventory_item_id,
           title: variant.title,
           inventory_quantity: variant.inventory_quantity,
@@ -83,33 +176,30 @@ const HomePage: React.FC = () => {
         recentlyModified: false, // TODO: Implement recently modified logic
       };
 
-      // Get inventory levels for all variants to show secondary location data
-      const inventoryItemIds = product.variants.map((v) => v.inventory_item_id);
-      const inventoryLevels = await TauriAPI.Inventory.getInventoryLevels(
-        inventoryItemIds
-      );
+      console.log("📦 HomePage: Converted product details:", productDetails);
 
       // Create secondary details (for second location)
       const secondaryDetails: SecondaryDetails = {
         availableVariants: product.variants.map((variant) => {
-          // Get inventory for secondary location (assume different location ID)
-          const variantInventory =
-            inventoryLevels[variant.inventory_item_id] || {};
-          const secondaryLocationInventory =
-            Object.values(variantInventory)[1] || 0; // Second location
-
+          const inventoryData = inventoryLevels[variant.inventory_item_id] || {
+            primary: 0,
+            secondary: 0,
+          };
           return {
             inventory_item_id: variant.inventory_item_id,
             title: variant.title,
-            inventory_quantity: secondaryLocationInventory,
+            inventory_quantity: inventoryData.secondary, // Use secondary location inventory
           };
         }),
       };
 
+      console.log("🏪 HomePage: Secondary location details:", secondaryDetails);
+
       setProductDetails(productDetails);
       setSecondaryProductDetails(secondaryDetails);
+      console.log("✅ HomePage: Product data set successfully");
     } catch (error) {
-      console.error("Error fetching product:", error);
+      console.error("❌ HomePage: Error fetching product:", error);
       message.error("Prodotto non trovato, prova un altro barcode");
     } finally {
       setLoading(false);
@@ -121,7 +211,7 @@ const HomePage: React.FC = () => {
 
     setLoading(true);
     try {
-      console.log("Searching by SKU:", skuInput);
+      console.log("🚀 HomePage: Starting SKU search for:", skuInput);
 
       // Use exact SKU search first
       const exactProduct = await TauriAPI.Product.findProductByExactSku(
@@ -129,21 +219,33 @@ const HomePage: React.FC = () => {
       );
 
       if (exactProduct) {
+        console.log(
+          "✅ HomePage: Found exact SKU match, using product:",
+          exactProduct.title
+        );
         // Found exact match, use it directly
         await handleSearchSelect(exactProduct.id, skuInput);
       } else {
+        console.log(
+          "⚠️ HomePage: No exact SKU match, trying partial search..."
+        );
         // Try partial SKU search
         const products = await TauriAPI.Product.searchProductsBySku(skuInput);
 
         if (products.length > 0) {
+          console.log(
+            `✅ HomePage: Found ${products.length} partial SKU matches, using first:`,
+            products[0].title
+          );
           // Use first result from partial search
           await handleSearchSelect(products[0].id, skuInput);
         } else {
+          console.log("❌ HomePage: No products found with SKU:", skuInput);
           throw new Error("No products found with this SKU");
         }
       }
     } catch (error) {
-      console.error("Error searching by SKU:", error);
+      console.error("❌ HomePage: Error searching by SKU:", error);
       message.error("SKU non trovato");
     } finally {
       setLoading(false);
@@ -151,6 +253,17 @@ const HomePage: React.FC = () => {
   };
 
   const handleVariantSelect = (variant: string) => {
+    // Find the variant object to check inventory
+    const variantObj = productDetails?.varaintiArticolo.find(
+      (v) => v.title === variant
+    );
+
+    // Don't allow selection if variant has zero inventory
+    if (!variantObj || variantObj.inventory_quantity === 0) {
+      message.warning(`La taglia ${variant} non è disponibile (quantità: 0)`);
+      return;
+    }
+
     setSelectedVariant(variant);
   };
 
@@ -236,10 +349,33 @@ const HomePage: React.FC = () => {
     }
   };
 
-  const handleViewOnShopify = () => {
+  const handleViewOnShopify = async () => {
     if (productDetails) {
       const url = `https://admin.shopify.com/store/cappelletto/products/${productDetails.id}`;
-      window.open(url, "_blank");
+      try {
+        await openUrl(url);
+      } catch (error) {
+        console.error("Failed to open Shopify admin:", error);
+        message.error("Impossibile aprire il link di Shopify");
+      }
+    }
+  };
+
+  const handleViewOnShop = async () => {
+    if (productDetails) {
+      // Convert product title to handle format (lowercase, spaces to dashes, remove special chars)
+      const productHandle = productDetails.nomeArticolo
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9\-]/g, "");
+
+      const url = `https://cappelletto.myshopify.com/products/${productHandle}`;
+      try {
+        await openUrl(url);
+      } catch (error) {
+        console.error("Failed to open online shop:", error);
+        message.error("Impossibile aprire il link del negozio online");
+      }
     }
   };
 
@@ -260,11 +396,6 @@ const HomePage: React.FC = () => {
   return (
     <div style={{ padding: 24 }}>
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-        <Col>
-          <Title level={2} style={{ margin: 0 }}>
-            Rimuovi Prodotti
-          </Title>
-        </Col>
         <Col>
           <Badge count={version} color="#1890ff" />
         </Col>
@@ -339,26 +470,37 @@ const HomePage: React.FC = () => {
                   ))}
               </Row>
 
-              <Tag
-                color="blue"
-                style={{ fontSize: 16, padding: "4px 12px", marginBottom: 16 }}
+              {/* Price and Status Row */}
+              <Row
+                justify="center"
+                align="middle"
+                gutter={16}
+                style={{ marginBottom: 16 }}
               >
-                € {productDetails.prezzo}
-              </Tag>
+                <Col>
+                  <Tag
+                    color="blue"
+                    style={{ fontSize: 16, padding: "4px 12px" }}
+                  >
+                    € {productDetails.prezzo}
+                  </Tag>
+                </Col>
+                <Col>
+                  <Tag
+                    color={
+                      productDetails.recentlyModified ? "warning" : "success"
+                    }
+                    style={{ fontSize: 16, padding: "4px 12px" }}
+                  >
+                    {productDetails.recentlyModified
+                      ? "Recentemente Modificato"
+                      : "Non Recentemente Modificato"}
+                  </Tag>
+                </Col>
+              </Row>
 
+              {/* Description */}
               <Text>{productDetails.descrizioneArticolo}</Text>
-
-              <div style={{ marginTop: 16 }}>
-                <Tag
-                  color={
-                    productDetails.recentlyModified ? "warning" : "success"
-                  }
-                >
-                  {productDetails.recentlyModified
-                    ? "Recentemente Modificato"
-                    : "Non Recentemente Modificato"}
-                </Tag>
-              </div>
             </Card>
           </Col>
 
@@ -366,42 +508,72 @@ const HomePage: React.FC = () => {
             <Card title={`Varianti ${negozio}`} style={{ marginBottom: 16 }}>
               <List
                 dataSource={productDetails.varaintiArticolo}
-                renderItem={(variant) => (
-                  <List.Item
-                    style={{
-                      cursor: "pointer",
-                      backgroundColor:
-                        selectedVariant === variant.title
+                renderItem={(variant) => {
+                  const isOutOfStock = variant.inventory_quantity === 0;
+                  const isSelected = selectedVariant === variant.title;
+
+                  return (
+                    <List.Item
+                      style={{
+                        cursor: isOutOfStock ? "not-allowed" : "pointer",
+                        backgroundColor: isSelected
                           ? "#e6f7ff"
+                          : isOutOfStock
+                          ? "#f5f5f5"
                           : "transparent",
-                      padding: "8px 12px",
-                      border:
-                        selectedVariant === variant.title
+                        padding: "8px 12px",
+                        border: isSelected
                           ? "1px solid #1890ff"
                           : "1px solid transparent",
-                    }}
-                    onClick={() => handleVariantSelect(variant.title)}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        width: "100%",
+                        borderRadius: "8px",
+                        marginBottom: "2px",
+                        opacity: isOutOfStock ? 0.6 : 1,
                       }}
+                      onClick={() => handleVariantSelect(variant.title)}
                     >
-                      <Text>{variant.title}</Text>
-                      <Badge
-                        count={variant.inventory_quantity}
+                      <div
                         style={{
-                          backgroundColor:
-                            variant.inventory_quantity > 0
-                              ? "#52c41a"
-                              : "#f5222d",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          width: "100%",
                         }}
-                      />
-                    </div>
-                  </List.Item>
-                )}
+                      >
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                          <Text
+                            style={{
+                              color: isOutOfStock ? "#999" : "inherit",
+                              textDecoration: isOutOfStock
+                                ? "line-through"
+                                : "none",
+                            }}
+                          >
+                            {variant.title}
+                          </Text>
+                          {isOutOfStock && (
+                            <Text
+                              style={{
+                                color: "#f5222d",
+                                fontSize: "12px",
+                                marginLeft: 8,
+                              }}
+                            >
+                              (Esaurito)
+                            </Text>
+                          )}
+                        </div>
+                        <Badge
+                          count={variant.inventory_quantity}
+                          style={{
+                            backgroundColor:
+                              variant.inventory_quantity > 0
+                                ? "#52c41a"
+                                : "#f5222d",
+                          }}
+                        />
+                      </div>
+                    </List.Item>
+                  );
+                }}
               />
 
               {selectedVariant && (
@@ -425,28 +597,67 @@ const HomePage: React.FC = () => {
                 secondaryProductDetails.availableVariants.length > 0 ? (
                   <List
                     dataSource={secondaryProductDetails.availableVariants}
-                    renderItem={(variant) => (
-                      <List.Item>
-                        <div
+                    renderItem={(variant) => {
+                      const isOutOfStock = variant.inventory_quantity === 0;
+
+                      return (
+                        <List.Item
                           style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            width: "100%",
+                            backgroundColor: isOutOfStock
+                              ? "#f5f5f5"
+                              : "transparent",
+                            padding: "8px 12px",
+                            border: "1px solid transparent",
+                            borderRadius: "8px",
+                            marginBottom: "2px",
+                            opacity: isOutOfStock ? 0.6 : 1,
                           }}
                         >
-                          <Text>{variant.title}</Text>
-                          <Badge
-                            count={variant.inventory_quantity}
+                          <div
                             style={{
-                              backgroundColor:
-                                variant.inventory_quantity > 0
-                                  ? "#52c41a"
-                                  : "#f5222d",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              width: "100%",
                             }}
-                          />
-                        </div>
-                      </List.Item>
-                    )}
+                          >
+                            <div
+                              style={{ display: "flex", alignItems: "center" }}
+                            >
+                              <Text
+                                style={{
+                                  color: isOutOfStock ? "#999" : "inherit",
+                                  textDecoration: isOutOfStock
+                                    ? "line-through"
+                                    : "none",
+                                }}
+                              >
+                                {variant.title}
+                              </Text>
+                              {isOutOfStock && (
+                                <Text
+                                  style={{
+                                    color: "#f5222d",
+                                    fontSize: "12px",
+                                    marginLeft: 8,
+                                  }}
+                                >
+                                  (Esaurito)
+                                </Text>
+                              )}
+                            </div>
+                            <Badge
+                              count={variant.inventory_quantity}
+                              style={{
+                                backgroundColor:
+                                  variant.inventory_quantity > 0
+                                    ? "#52c41a"
+                                    : "#f5222d",
+                              }}
+                            />
+                          </div>
+                        </List.Item>
+                      );
+                    }}
                   />
                 ) : (
                   <Text strong>
@@ -456,15 +667,26 @@ const HomePage: React.FC = () => {
               </Panel>
             </Collapse>
 
-            <Button
-              type="default"
-              icon={<ShopOutlined />}
-              onClick={handleViewOnShopify}
-              block
-              size="large"
-            >
-              Visualizza su Shopify
-            </Button>
+            <Space direction="vertical" style={{ width: "100%" }}>
+              <Button
+                type="default"
+                icon={<ShopOutlined />}
+                onClick={handleViewOnShopify}
+                block
+                size="large"
+              >
+                Visualizza su Shopify
+              </Button>
+              <Button
+                type="primary"
+                icon={<GlobalOutlined />}
+                onClick={handleViewOnShop}
+                block
+                size="large"
+              >
+                Visualizza su Shop
+              </Button>
+            </Space>
           </Col>
         </Row>
       )}
@@ -512,6 +734,71 @@ const HomePage: React.FC = () => {
           <Button type="primary" icon={<CloseOutlined />} onClick={handleReset}>
             Chiudi
           </Button>
+        </div>
+      </Modal>
+
+      {/* Settings Modal */}
+      <Modal
+        title={
+          <Space>
+            <SettingOutlined />
+            Impostazioni
+          </Space>
+        }
+        open={settingsModalVisible}
+        onOk={handleSettingsOk}
+        onCancel={() => setSettingsModalVisible(false)}
+        okText="Salva"
+        cancelText="Annulla"
+        width={400}
+      >
+        <div style={{ padding: "16px 0" }}>
+          <Title level={5}>Posizione Principale</Title>
+          <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
+            Seleziona la tua posizione principale. Questa sarà usata come
+            negozio primario per la gestione dell'inventario.
+          </Text>
+
+          <Radio.Group
+            value={primaryLocation}
+            onChange={(e) => handleLocationChange(e.target.value)}
+            style={{ width: "100%" }}
+          >
+            <Space direction="vertical" style={{ width: "100%" }}>
+              <Radio value="Treviso" style={{ fontSize: 16, padding: "8px 0" }}>
+                <Space>
+                  <span>Treviso</span>
+                  {primaryLocation === "Treviso" && (
+                    <Tag color="blue">Principale</Tag>
+                  )}
+                  {secondaryLocation === "Treviso" && (
+                    <Tag color="default">Secondario</Tag>
+                  )}
+                </Space>
+              </Radio>
+              <Radio
+                value="Mogliano"
+                style={{ fontSize: 16, padding: "8px 0" }}
+              >
+                <Space>
+                  <span>Mogliano</span>
+                  {primaryLocation === "Mogliano" && (
+                    <Tag color="blue">Principale</Tag>
+                  )}
+                  {secondaryLocation === "Mogliano" && (
+                    <Tag color="default">Secondario</Tag>
+                  )}
+                </Space>
+              </Radio>
+            </Space>
+          </Radio.Group>
+
+          <Divider />
+
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            💡 Suggerimento: Usa Cmd+, (Mac) o Ctrl+, (Windows) per aprire
+            rapidamente le impostazioni
+          </Text>
         </div>
       </Modal>
     </div>

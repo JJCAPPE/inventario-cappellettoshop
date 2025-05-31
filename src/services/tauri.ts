@@ -31,6 +31,16 @@ export interface StatusResponse {
   message: string;
 }
 
+export interface LocationConfig {
+  primary_location: LocationInfo;
+  secondary_location: LocationInfo;
+}
+
+export interface LocationInfo {
+  name: string;
+  id: string;
+}
+
 // Product API functions
 export class ProductAPI {
   /**
@@ -38,7 +48,9 @@ export class ProductAPI {
    */
   static async getProducts(): Promise<Product[]> {
     try {
-      return await invoke<Product[]>("get_products");
+      const result = await invoke<Product[]>("get_products");
+      console.log("🔍 Raw API Response - get_products:", result);
+      return result;
     } catch (error) {
       console.error("Error fetching products:", error);
       throw new Error(`Failed to fetch products: ${error}`);
@@ -50,7 +62,12 @@ export class ProductAPI {
    */
   static async getProductById(productId: string): Promise<Product> {
     try {
-      return await invoke<Product>("get_product_by_id", { productId });
+      const result = await invoke<Product>("get_product_by_id", { productId });
+      console.log(
+        `🔍 Raw API Response - get_product_by_id (${productId}):`,
+        result
+      );
+      return result;
     } catch (error) {
       console.error("Error fetching product by ID:", error);
       throw new Error(`Failed to fetch product ${productId}: ${error}`);
@@ -62,10 +79,35 @@ export class ProductAPI {
    */
   static async searchProducts(query: string): Promise<Product[]> {
     try {
-      return await invoke<Product[]>("search_products", { query });
+      const result = await invoke<Product[]>("search_products", { query });
+      console.log(`🔍 Raw API Response - search_products (${query}):`, result);
+      return result;
     } catch (error) {
       console.error("Error searching products:", error);
       throw new Error(`Failed to search products: ${error}`);
+    }
+  }
+
+  /**
+   * Search products by partial name using GraphQL (better partial matching)
+   */
+  static async searchProductsByNameGraphQL(name: string): Promise<Product[]> {
+    try {
+      const result = await invoke<Product[]>(
+        "search_products_by_name_graphql",
+        { name }
+      );
+      console.log(
+        `🔍 Raw API Response - search_products_by_name_graphql (${name}):`,
+        result
+      );
+      console.log(
+        `📊 GraphQL search found ${result.length} products for "${name}"`
+      );
+      return result;
+    } catch (error) {
+      console.error("Error in GraphQL product search:", error);
+      throw new Error(`Failed to search products by name: ${error}`);
     }
   }
 
@@ -74,7 +116,12 @@ export class ProductAPI {
    */
   static async searchProductsBySku(sku: string): Promise<Product[]> {
     try {
-      return await invoke<Product[]>("search_products_by_sku", { sku });
+      const result = await invoke<Product[]>("search_products_by_sku", { sku });
+      console.log(
+        `🔍 Raw API Response - search_products_by_sku (${sku}):`,
+        result
+      );
+      return result;
     } catch (error) {
       console.error("Error searching products by SKU:", error);
       throw new Error(`Failed to search products by SKU: ${error}`);
@@ -86,7 +133,15 @@ export class ProductAPI {
    */
   static async searchProductsEnhanced(query: string): Promise<Product[]> {
     try {
-      return await invoke<Product[]>("search_products_enhanced", { query });
+      const result = await invoke<Product[]>("search_products_enhanced", {
+        query,
+      });
+      console.log(
+        `🔍 Raw API Response - search_products_enhanced (${query}):`,
+        result
+      );
+      console.log(`📊 Found ${result.length} products matching "${query}"`);
+      return result;
     } catch (error) {
       console.error("Error in enhanced product search:", error);
       throw new Error(`Failed to search products: ${error}`);
@@ -98,7 +153,19 @@ export class ProductAPI {
    */
   static async findProductByExactSku(sku: string): Promise<Product | null> {
     try {
-      return await invoke<Product | null>("find_product_by_exact_sku", { sku });
+      const result = await invoke<Product | null>("find_product_by_exact_sku", {
+        sku,
+      });
+      console.log(
+        `🔍 Raw API Response - find_product_by_exact_sku (${sku}):`,
+        result
+      );
+      if (result) {
+        console.log(`✅ Found exact SKU match: ${result.title}`);
+      } else {
+        console.log(`❌ No exact SKU match found for: ${sku}`);
+      }
+      return result;
     } catch (error) {
       console.error("Error finding product by exact SKU:", error);
       throw new Error(`Failed to find product by SKU: ${error}`);
@@ -109,13 +176,78 @@ export class ProductAPI {
 // Inventory API functions
 export class InventoryAPI {
   /**
-   * Get inventory levels for specific items
+   * Get location configuration from backend
+   */
+  static async getLocationConfig(): Promise<LocationConfig> {
+    try {
+      const result = await invoke<LocationConfig>("get_location_config");
+      console.log(`🔍 Raw API Response - get_location_config:`, result);
+      return result;
+    } catch (error) {
+      console.error("Error fetching location config:", error);
+      throw new Error(`Failed to fetch location config: ${error}`);
+    }
+  }
+
+  /**
+   * Get inventory levels for specific items with location awareness
+   */
+  static async getInventoryLevelsForLocations(
+    inventoryItemIds: string[],
+    primaryLocationName: string
+  ): Promise<{ [itemId: string]: { primary: number; secondary: number } }> {
+    try {
+      const result = await invoke<{
+        [itemId: string]: { primary?: number; secondary?: number };
+      }>("get_inventory_levels_for_locations", {
+        inventoryItemIds,
+        primaryLocationName,
+      });
+      console.log(
+        `🔍 Raw API Response - get_inventory_levels_for_locations:`,
+        result
+      );
+      console.log(`🏪 Primary location: ${primaryLocationName}`);
+      console.log(
+        `📊 Inventory levels for ${inventoryItemIds.length} items:`,
+        inventoryItemIds
+      );
+
+      // Ensure all items have both primary and secondary values
+      const processedResult: {
+        [itemId: string]: { primary: number; secondary: number };
+      } = {};
+      for (const itemId of inventoryItemIds) {
+        const itemData = result[itemId] || {};
+        processedResult[itemId] = {
+          primary: itemData.primary || 0,
+          secondary: itemData.secondary || 0,
+        };
+      }
+
+      return processedResult;
+    } catch (error) {
+      console.error("Error fetching location-aware inventory levels:", error);
+      throw new Error(`Failed to fetch inventory levels: ${error}`);
+    }
+  }
+
+  /**
+   * Get inventory levels for specific items (legacy function)
    */
   static async getInventoryLevels(
     inventoryItemIds: string[]
   ): Promise<{ [itemId: string]: { [locationId: string]: number } }> {
     try {
-      return await invoke("get_inventory_levels", { inventoryItemIds });
+      const result = await invoke<{
+        [itemId: string]: { [locationId: string]: number };
+      }>("get_inventory_levels", { inventoryItemIds });
+      console.log(`🔍 Raw API Response - get_inventory_levels:`, result);
+      console.log(
+        `📊 Inventory levels for ${inventoryItemIds.length} items:`,
+        inventoryItemIds
+      );
+      return result;
     } catch (error) {
       console.error("Error fetching inventory levels:", error);
       throw new Error(`Failed to fetch inventory levels: ${error}`);
@@ -129,7 +261,12 @@ export class InventoryAPI {
     updates: InventoryUpdate[]
   ): Promise<StatusResponse> {
     try {
-      return await invoke<StatusResponse>("adjust_inventory", { updates });
+      const result = await invoke<StatusResponse>("adjust_inventory", {
+        updates,
+      });
+      console.log(`🔍 Raw API Response - adjust_inventory:`, result);
+      console.log(`📝 Inventory adjustments:`, updates);
+      return result;
     } catch (error) {
       console.error("Error adjusting inventory:", error);
       throw new Error(`Failed to adjust inventory: ${error}`);
@@ -145,11 +282,16 @@ export class InventoryAPI {
     quantity: number
   ): Promise<StatusResponse> {
     try {
-      return await invoke<StatusResponse>("set_inventory_level", {
+      const result = await invoke<StatusResponse>("set_inventory_level", {
         inventoryItemId,
         locationId,
         quantity,
       });
+      console.log(`🔍 Raw API Response - set_inventory_level:`, result);
+      console.log(
+        `📝 Set inventory: Item ${inventoryItemId} at location ${locationId} to ${quantity}`
+      );
+      return result;
     } catch (error) {
       console.error("Error setting inventory level:", error);
       throw new Error(`Failed to set inventory level: ${error}`);
@@ -161,7 +303,15 @@ export class InventoryAPI {
    */
   static async getLowStockProducts(threshold: number): Promise<any[]> {
     try {
-      return await invoke("get_low_stock_products", { threshold });
+      const result = await invoke<any[]>("get_low_stock_products", {
+        threshold,
+      });
+      console.log(
+        `🔍 Raw API Response - get_low_stock_products (threshold: ${threshold}):`,
+        result
+      );
+      console.log(`📊 Found ${result.length} products with low stock`);
+      return result;
     } catch (error) {
       console.error("Error fetching low stock products:", error);
       throw new Error(`Failed to fetch low stock products: ${error}`);
@@ -176,7 +326,9 @@ export class StatusAPI {
    */
   static async testShopifyConnection(): Promise<StatusResponse> {
     try {
-      return await invoke<StatusResponse>("test_shopify_connection");
+      const result = await invoke<StatusResponse>("test_shopify_connection");
+      console.log("🔍 Raw API Response - test_shopify_connection:", result);
+      return result;
     } catch (error) {
       console.error("Error testing Shopify connection:", error);
       throw new Error(`Failed to test connection: ${error}`);
@@ -188,7 +340,9 @@ export class StatusAPI {
    */
   static async greet(name: string): Promise<string> {
     try {
-      return await invoke<string>("greet", { name });
+      const result = await invoke<string>("greet", { name });
+      console.log(`🔍 Raw API Response - greet (${name}):`, result);
+      return result;
     } catch (error) {
       console.error("Error in greet function:", error);
       throw new Error(`Failed to greet: ${error}`);

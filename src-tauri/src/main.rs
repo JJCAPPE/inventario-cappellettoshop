@@ -11,6 +11,7 @@ use inventario_cappellettoshop_lib::utils::AppConfig;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // Initialize app configuration from environment
             let config = AppConfig::from_env()
@@ -28,10 +29,13 @@ fn main() {
             products::search_products,
             products::search_products_by_sku,
             products::search_products_enhanced,
+            products::search_products_by_name_graphql,
             products::find_product_by_exact_sku,
             
             // Inventory commands  
             inventory::get_inventory_levels,
+            inventory::get_inventory_levels_for_locations,
+            inventory::get_location_config,
             inventory::adjust_inventory,
             inventory::set_inventory_level,
             inventory::get_low_stock_products,
