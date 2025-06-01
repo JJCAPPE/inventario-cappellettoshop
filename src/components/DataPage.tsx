@@ -1,6 +1,21 @@
 import React, { useEffect } from "react";
-import { Input, List, Avatar, Tag, Typography, Empty, Space } from "antd";
-import { SearchOutlined, ShoppingOutlined } from "@ant-design/icons";
+import {
+  Input,
+  List,
+  Avatar,
+  Tag,
+  Typography,
+  Empty,
+  Space,
+  Button,
+  Alert,
+  Spin,
+} from "antd";
+import {
+  SearchOutlined,
+  ShoppingOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
 import { useLogs } from "../contexts/LogContext";
 import dayjs from "dayjs";
 
@@ -8,26 +23,35 @@ const { Text, Title } = Typography;
 const { Search } = Input;
 
 const DataPage: React.FC = () => {
-  const { logs, fetchLogs } = useLogs();
+  const { logs, loading, error, fetchLogs, refreshLogs } = useLogs();
 
   useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    console.log(
+      "📋 DataPage mounted - fetching fresh logs for modifications panel"
+    );
+    fetchLogs(undefined, true); // Force refresh when panel opens
+  }, []); // Only run on mount
 
   const handleSearch = (value: string) => {
+    console.log("🔍 DataPage: Searching logs with query:", value);
     fetchLogs(value);
   };
 
+  const handleRefresh = () => {
+    console.log("🔄 DataPage: Manual refresh button clicked");
+    refreshLogs();
+  };
+
   const formatTime = (timestamp: string) => {
-    return dayjs(timestamp).format("HH:mm");
+    return dayjs(timestamp).format("DD/MM HH:mm");
   };
 
   const getRequestTypeColor = (requestType: string) => {
     switch (requestType) {
       case "Rettifica":
-        return "red";
+        return "green";
       case "Annullamento":
-        return "orange";
+        return "red";
       default:
         return "blue";
     }
@@ -37,11 +61,40 @@ const DataPage: React.FC = () => {
     return <ShoppingOutlined />;
   };
 
+  // Get current location for display
+  const currentLocation = localStorage.getItem("primaryLocation") || "Treviso";
+
+  console.log(
+    "📊 DataPage render - logs count:",
+    logs.length,
+    "loading:",
+    loading,
+    "error:",
+    error
+  );
+
   return (
     <div style={{ padding: 16, height: "100%", backgroundColor: "#fafafa" }}>
-      <Title level={4} style={{ marginBottom: 16 }}>
-        Modifiche Recenti
-      </Title>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
+        <Title level={4} style={{ margin: 0 }}>
+          Modifiche Recenti (Ultime 24h) - {currentLocation}
+        </Title>
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={handleRefresh}
+          loading={loading}
+          type="default"
+        >
+          Aggiorna
+        </Button>
+      </div>
 
       <Search
         placeholder="Filtra modifiche..."
@@ -49,11 +102,40 @@ const DataPage: React.FC = () => {
         onSearch={handleSearch}
         style={{ marginBottom: 16 }}
         prefix={<SearchOutlined />}
+        disabled={loading}
       />
 
-      {logs.length === 0 ? (
+      {error && (
+        <Alert
+          message="Errore nel caricamento"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          action={
+            <Button size="small" onClick={handleRefresh}>
+              Riprova
+            </Button>
+          }
+        />
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "50px 0" }}>
+          <Spin size="large" />
+          <div style={{ marginTop: 16 }}>
+            <Text type="secondary">
+              Caricamento modifiche per {currentLocation}...
+            </Text>
+          </div>
+        </div>
+      ) : logs.length === 0 ? (
         <Empty
-          description="Nessuna modifica oggi"
+          description={
+            error
+              ? "Errore nel caricamento delle modifiche"
+              : `Nessuna modifica nelle ultime 24 ore per ${currentLocation}`
+          }
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         />
       ) : (
@@ -64,7 +146,11 @@ const DataPage: React.FC = () => {
             <List.Item
               style={{
                 backgroundColor:
-                  log.requestType === "Annullamento" ? "#fff2e8" : "#fff",
+                  log.requestType === "Annullamento"
+                    ? "#ffebee" // Light red background for Annullamento
+                    : log.requestType === "Rettifica"
+                    ? "#e8f5e8" // Light green background for Rettifica
+                    : "#fff", // Default white for other types
                 border: "1px solid #f0f0f0",
                 borderRadius: 8,
                 marginBottom: 8,

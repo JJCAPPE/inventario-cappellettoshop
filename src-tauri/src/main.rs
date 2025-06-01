@@ -7,6 +7,8 @@ use tauri::Manager;
 use inventario_cappellettoshop_lib::products;
 use inventario_cappellettoshop_lib::inventory;
 use inventario_cappellettoshop_lib::status;
+use inventario_cappellettoshop_lib::firebase;
+use inventario_cappellettoshop_lib::location;
 use inventario_cappellettoshop_lib::utils::AppConfig;
 
 fn main() {
@@ -39,6 +41,23 @@ fn main() {
             inventory::adjust_inventory,
             inventory::set_inventory_level,
             inventory::get_low_stock_products,
+            
+            // Enhanced inventory commands with Firebase logging
+            inventory::decrease_inventory_with_logging,
+            inventory::undo_decrease_inventory_with_logging,
+            
+            // Firebase commands
+            firebase::create_log,
+            firebase::get_logs,
+            firebase::get_logs_date_range,
+            firebase::get_firebase_config,
+            
+            // Location commands
+            location::get_app_location,
+            location::set_app_location,
+            location::get_available_locations,
+            location::get_location_by_name,
+            location::get_current_location_config,
             
             // Status commands
             status::test_shopify_connection,
