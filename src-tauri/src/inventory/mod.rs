@@ -3,22 +3,18 @@ use serde_json::{json, Value};
 use tauri::State;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use crate::firebase::{create_inventory_log_data, FirebaseClient, LogEntry};
+use crate::location::LocationInfo;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct LocationConfig {
+pub struct LocationConfigResponse {
     pub primary_location: LocationInfo,
     pub secondary_location: LocationInfo,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LocationInfo {
-    pub name: String,
-    pub id: String,
-}
-
 #[tauri::command]
-pub async fn get_location_config(config: State<'_, AppConfig>) -> Result<LocationConfig, String> {
-    Ok(LocationConfig {
+pub async fn get_location_config(config: State<'_, AppConfig>) -> Result<LocationConfigResponse, String> {
+    Ok(LocationConfigResponse {
         primary_location: LocationInfo {
             name: "Treviso".to_string(),
             id: config.primary_location.clone(),
@@ -264,4 +260,122 @@ pub async fn get_low_stock_products(config: State<'_, AppConfig>, threshold: i32
     }
 
     Ok(low_stock_products)
+}
+
+#[tauri::command]
+pub async fn decrease_inventory_with_logging(
+    inventory_item_id: String,
+    location_id: String,
+    product_id: String,
+    variant_title: String,
+    product_name: String,
+    price: String,
+    negozio: String,
+    images: Vec<String>,
+    config: tauri::State<'_, AppConfig>,
+) -> Result<StatusResponse, String> {
+    println!("📦 Starting inventory decrease with logging:");
+    println!("   🏪 Store: {}", negozio);
+    println!("   📦 Product: {} ({})", product_name, variant_title);
+    println!("   📍 Location ID: {}", location_id);
+    println!("   🔢 Inventory Item ID: {}", inventory_item_id);
+    
+    // Adjust inventory first
+    let update = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: location_id.clone(),
+        adjustment: -1,
+    };
+    
+    println!("📉 Adjusting Shopify inventory...");
+    adjust_inventory(config.clone(), vec![update]).await?;
+    println!("✅ Shopify inventory adjusted successfully");
+    
+    // Create log entry
+    let log_data = create_inventory_log_data(
+        product_id,
+        variant_title,
+        negozio,
+        inventory_item_id,
+        product_name,
+        price,
+        -1,
+        images,
+    );
+    
+    // Save to Firebase
+    println!("📝 Creating Firebase log entry...");
+    let firebase_client = FirebaseClient::new(config.inner().clone());
+    let log_entry = LogEntry {
+        request_type: "Rettifica".to_string(),
+        data: log_data,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+    
+    firebase_client.create_log(log_entry).await?;
+    
+    println!("✅ Inventory decrease completed with logging");
+    Ok(StatusResponse {
+        status: "success".to_string(),
+        message: "Inventory decreased and logged successfully".to_string(),
+    })
+}
+
+#[tauri::command]
+pub async fn undo_decrease_inventory_with_logging(
+    inventory_item_id: String,
+    location_id: String,
+    product_id: String,
+    variant_title: String,
+    product_name: String,
+    price: String,
+    negozio: String,
+    images: Vec<String>,
+    config: tauri::State<'_, AppConfig>,
+) -> Result<StatusResponse, String> {
+    println!("🔄 Starting inventory undo (increase) with logging:");
+    println!("   🏪 Store: {}", negozio);
+    println!("   📦 Product: {} ({})", product_name, variant_title);
+    println!("   📍 Location ID: {}", location_id);
+    println!("   🔢 Inventory Item ID: {}", inventory_item_id);
+    
+    // Adjust inventory first (increase by 1)
+    let update = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: location_id.clone(),
+        adjustment: 1,
+    };
+    
+    println!("📈 Adjusting Shopify inventory (undo)...");
+    adjust_inventory(config.clone(), vec![update]).await?;
+    println!("✅ Shopify inventory adjusted successfully");
+    
+    // Create log entry
+    let log_data = create_inventory_log_data(
+        product_id,
+        variant_title,
+        negozio,
+        inventory_item_id,
+        product_name,
+        price,
+        1,
+        images,
+    );
+    
+    // Save to Firebase
+    println!("📝 Creating Firebase log entry (undo)...");
+    let firebase_client = FirebaseClient::new(config.inner().clone());
+    let log_entry = LogEntry {
+        request_type: "Annullamento".to_string(),
+        data: log_data,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+    
+    firebase_client.create_log(log_entry).await?;
+    
+    println!("✅ Inventory undo completed with logging");
+    Ok(StatusResponse {
+        status: "success".to_string(),
+        message: "Inventory increase (undo) and logged successfully".to_string(),
+    })
 } 

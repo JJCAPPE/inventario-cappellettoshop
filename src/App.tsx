@@ -22,11 +22,28 @@ function App() {
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const handleSidebarToggle = (view: SidebarView) => {
+    console.log("🔄 Toggle clicked:", { view, currentView, sidebarVisible });
+
     if (sidebarVisible && currentView === view) {
+      // Currently open with the same view - close it
+      console.log("📱 Closing sidebar");
       setSidebarVisible(false);
     } else {
+      // Either closed or different view - open with new view
+      console.log("📱 Opening sidebar with view:", view);
       setCurrentView(view);
       setSidebarVisible(true);
+    }
+  };
+
+  // Simplified toggle function
+  const handleDataPanelToggle = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent event bubbling
+    console.log("🔄 Data panel toggle clicked:", { sidebarVisible });
+
+    setSidebarVisible(!sidebarVisible);
+    if (!sidebarVisible) {
+      setCurrentView("data");
     }
   };
 
@@ -50,7 +67,13 @@ function App() {
           target.closest(".ant-modal") ||
           target.closest(".ant-drawer");
 
-        if (!isAntdOverlay) {
+        // Also check if click is on the toggle button itself
+        const isToggleButton = target.closest(
+          'button[title*="pannello modifiche"]'
+        );
+
+        if (!isAntdOverlay && !isToggleButton) {
+          console.log("📱 Clicking outside - closing sidebar");
           setSidebarVisible(false);
         }
       }
@@ -102,7 +125,7 @@ function App() {
                 sidebarVisible && currentView === "data" ? "primary" : "default"
               }
               icon={<HistoryOutlined />}
-              onClick={() => handleSidebarToggle("data")}
+              onClick={handleDataPanelToggle}
               style={{
                 background:
                   sidebarVisible && currentView === "data"
@@ -116,10 +139,19 @@ function App() {
                   sidebarVisible && currentView === "data"
                     ? "white"
                     : "#d9d9d9",
+                transition: "all 0.2s ease",
               }}
+              title={
+                sidebarVisible && currentView === "data"
+                  ? "Chiudi pannello modifiche"
+                  : "Apri pannello modifiche"
+              }
             >
-              Modifiche
+              {sidebarVisible && currentView === "data"
+                ? "Chiudi Modifiche"
+                : "Modifiche"}
             </Button>
+            {/* Statistics button temporarily hidden 
             <Button
               type={
                 sidebarVisible && currentView === "statistics"
@@ -145,6 +177,7 @@ function App() {
             >
               Statistiche
             </Button>
+            */}
           </div>
         </Header>
 

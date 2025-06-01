@@ -38,42 +38,24 @@ const SearchBar: React.FC<SearchBarProps> = ({
     setLoading(true);
     setSearchStatus(""); // Reset status while searching
     try {
-      console.log("🚀 SearchBar: Starting unified search for:", searchQuery);
+      console.log("🚀 SearchBar: Starting concurrent search for:", searchQuery);
 
-      // First, try exact SKU search if the query looks like it could be a SKU
-      let skuProduct = null;
-      if (searchQuery.trim()) {
-        try {
-          console.log(
-            "🏷️ SearchBar: Trying exact SKU search for:",
-            searchQuery
-          );
-          skuProduct = await TauriAPI.Product.findProductByExactSku(
-            searchQuery.trim()
-          );
+      // Start both searches concurrently
+      const skuSearchPromise = searchQuery.trim()
+        ? TauriAPI.Product.findProductByExactSku(searchQuery.trim()).catch(
+            () => null
+          )
+        : Promise.resolve(null);
 
-          if (skuProduct) {
-            console.log(
-              "✅ SearchBar: Found exact SKU match:",
-              skuProduct.title
-            );
-            // Auto-select the SKU match
-            if (onAutoSelect) {
-              onAutoSelect(skuProduct.id, searchQuery);
-              setOptions([]);
-              return;
-            }
-          }
-        } catch (error) {
-          console.log(
-            "⚠️ SearchBar: No exact SKU match found, continuing with GraphQL search"
-          );
-        }
-      }
+      const graphqlSearchPromise = TauriAPI.Product.searchProductsByNameGraphQL(
+        searchQuery,
+        sortKey,
+        sortReverse
+      ).catch(() => []);
 
-      // If no SKU match found, do GraphQL search for product names
+      console.log("🏷️ SearchBar: Started exact SKU search for:", searchQuery);
       console.log(
-        "🔍 SearchBar: Performing GraphQL title search for:",
+        "🔍 SearchBar: Started GraphQL title search for:",
         searchQuery
       );
       console.log(
@@ -82,11 +64,24 @@ const SearchBar: React.FC<SearchBarProps> = ({
         "reverse:",
         sortReverse
       );
-      const products = await TauriAPI.Product.searchProductsByNameGraphQL(
-        searchQuery,
-        sortKey,
-        sortReverse
-      );
+
+      // Wait for both searches to complete
+      const [skuProduct, products] = await Promise.all([
+        skuSearchPromise,
+        graphqlSearchPromise,
+      ]);
+
+      // Check if we found an exact SKU match
+      if (skuProduct) {
+        console.log("✅ SearchBar: Found exact SKU match:", skuProduct.title);
+        // Auto-select the SKU match immediately
+        if (onAutoSelect) {
+          onAutoSelect(skuProduct.id, searchQuery);
+          setOptions([]);
+          return;
+        }
+      }
+
       console.log(
         `✅ SearchBar: GraphQL search returned ${products.length} products`
       );

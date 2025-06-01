@@ -41,6 +41,34 @@ export interface LocationInfo {
   id: string;
 }
 
+// Firebase-related type definitions
+export interface LogData {
+  id: string;
+  variant: string;
+  negozio: string;
+  inventory_item_id: string;
+  nome: string;
+  prezzo: string;
+  rettifica: number;
+  images: string[];
+}
+
+export interface LogEntry {
+  request_type: string;
+  data: LogData;
+  timestamp: string;
+}
+
+export interface FirebaseConfig {
+  api_key: string;
+  auth_domain: string;
+  project_id: string;
+  storage_bucket: string;
+  messaging_sender_id: string;
+  app_id: string;
+  measurement_id: string;
+}
+
 // Product API functions
 export class ProductAPI {
   /**
@@ -327,6 +355,285 @@ export class InventoryAPI {
       throw new Error(`Failed to fetch low stock products: ${error}`);
     }
   }
+
+  /**
+   * Decrease inventory by 1 and log to Firebase (enhanced function)
+   */
+  static async decreaseInventoryWithLogging(
+    inventoryItemId: string,
+    locationId: string,
+    productId: string,
+    variantTitle: string,
+    productName: string,
+    price: string,
+    negozio: string,
+    images: string[]
+  ): Promise<StatusResponse> {
+    try {
+      const result = await invoke<StatusResponse>(
+        "decrease_inventory_with_logging",
+        {
+          inventoryItemId,
+          locationId,
+          productId,
+          variantTitle,
+          productName,
+          price,
+          negozio,
+          images,
+        }
+      );
+      console.log(
+        `🔍 Raw API Response - decrease_inventory_with_logging:`,
+        result
+      );
+      console.log(
+        `📝 Decreased inventory for ${productName} (${variantTitle}) at ${negozio}`
+      );
+      return result;
+    } catch (error) {
+      console.error("Error decreasing inventory with logging:", error);
+      throw new Error(`Failed to decrease inventory: ${error}`);
+    }
+  }
+
+  /**
+   * Undo inventory decrease (increase by 1) and log to Firebase (enhanced function)
+   */
+  static async undoDecreaseInventoryWithLogging(
+    inventoryItemId: string,
+    locationId: string,
+    productId: string,
+    variantTitle: string,
+    productName: string,
+    price: string,
+    negozio: string,
+    images: string[]
+  ): Promise<StatusResponse> {
+    try {
+      const result = await invoke<StatusResponse>(
+        "undo_decrease_inventory_with_logging",
+        {
+          inventoryItemId,
+          locationId,
+          productId,
+          variantTitle,
+          productName,
+          price,
+          negozio,
+          images,
+        }
+      );
+      console.log(
+        `🔍 Raw API Response - undo_decrease_inventory_with_logging:`,
+        result
+      );
+      console.log(
+        `📝 Undid inventory decrease for ${productName} (${variantTitle}) at ${negozio}`
+      );
+      return result;
+    } catch (error) {
+      console.error("Error undoing inventory decrease with logging:", error);
+      throw new Error(`Failed to undo inventory decrease: ${error}`);
+    }
+  }
+}
+
+// Firebase API functions
+export class FirebaseAPI {
+  /**
+   * Create a log entry in Firebase
+   */
+  static async createLog(
+    requestType: string,
+    data: LogData
+  ): Promise<StatusResponse> {
+    try {
+      const result = await invoke<StatusResponse>("create_log", {
+        requestType,
+        data,
+      });
+      console.log(`🔍 Raw API Response - create_log (${requestType}):`, result);
+      console.log(`📝 Log data:`, data);
+      return result;
+    } catch (error) {
+      console.error("Error creating log:", error);
+      throw new Error(`Failed to create log: ${error}`);
+    }
+  }
+
+  /**
+   * Get logs from Firebase with optional filtering
+   */
+  static async getLogs(query?: string, location?: string): Promise<LogEntry[]> {
+    try {
+      const result = await invoke<LogEntry[]>("get_logs", {
+        query: query || null,
+        location: location || "Treviso", // Default to Treviso
+      });
+      console.log(
+        `🔍 Raw API Response - get_logs (query: ${query}, location: ${location}):`,
+        result
+      );
+      console.log(`📊 Found ${result.length} log entries`);
+      return result;
+    } catch (error) {
+      console.error("Error fetching logs:", error);
+      throw new Error(`Failed to fetch logs: ${error}`);
+    }
+  }
+
+  /**
+   * Get Firebase configuration
+   */
+  static async getFirebaseConfig(): Promise<FirebaseConfig> {
+    try {
+      const result = await invoke<FirebaseConfig>("get_firebase_config");
+      console.log(`🔍 Raw API Response - get_firebase_config:`, result);
+      return result;
+    } catch (error) {
+      console.error("Error fetching Firebase config:", error);
+      throw new Error(`Failed to fetch Firebase config: ${error}`);
+    }
+  }
+
+  /**
+   * Helper function to create inventory log data
+   */
+  static createInventoryLogData(
+    productId: string,
+    variantTitle: string,
+    negozio: string,
+    inventoryItemId: string,
+    productName: string,
+    price: string,
+    adjustment: number,
+    images: string[]
+  ): LogData {
+    return {
+      id: productId,
+      variant: variantTitle,
+      negozio,
+      inventory_item_id: inventoryItemId,
+      nome: productName,
+      prezzo: price,
+      rettifica: adjustment,
+      images,
+    };
+  }
+
+  /**
+   * Get logs from Firebase with date range filtering
+   */
+  static async getLogsDateRange(
+    startDate: string,
+    endDate: string,
+    query?: string,
+    location?: string
+  ): Promise<LogEntry[]> {
+    try {
+      const result = await invoke<LogEntry[]>("get_logs_date_range", {
+        query: query || null,
+        location: location || "Treviso", // Default to Treviso
+        startDate,
+        endDate,
+      });
+      console.log(
+        `🔍 Raw API Response - get_logs_date_range (${startDate} to ${endDate}, query: ${query}, location: ${location}):`,
+        result
+      );
+      console.log(`📊 Found ${result.length} log entries in date range`);
+      return result;
+    } catch (error) {
+      console.error("Error fetching logs with date range:", error);
+      throw new Error(`Failed to fetch logs with date range: ${error}`);
+    }
+  }
+}
+
+// Location API functions
+export class LocationAPI {
+  /**
+   * Get the currently set app location
+   */
+  static async getAppLocation(): Promise<string> {
+    try {
+      const result = await invoke<string>("get_app_location");
+      console.log(`🔍 Raw API Response - get_app_location:`, result);
+      return result;
+    } catch (error) {
+      console.error("Error fetching app location:", error);
+      throw new Error(`Failed to fetch app location: ${error}`);
+    }
+  }
+
+  /**
+   * Set the app location
+   */
+  static async setAppLocation(location: string): Promise<StatusResponse> {
+    try {
+      const result = await invoke<StatusResponse>("set_app_location", {
+        location,
+      });
+      console.log(
+        `🔍 Raw API Response - set_app_location (${location}):`,
+        result
+      );
+      return result;
+    } catch (error) {
+      console.error("Error setting app location:", error);
+      throw new Error(`Failed to set app location: ${error}`);
+    }
+  }
+
+  /**
+   * Get all available locations
+   */
+  static async getAvailableLocations(): Promise<LocationInfo[]> {
+    try {
+      const result = await invoke<LocationInfo[]>("get_available_locations");
+      console.log(`🔍 Raw API Response - get_available_locations:`, result);
+      return result;
+    } catch (error) {
+      console.error("Error fetching available locations:", error);
+      throw new Error(`Failed to fetch available locations: ${error}`);
+    }
+  }
+
+  /**
+   * Get location info by name
+   */
+  static async getLocationByName(locationName: string): Promise<LocationInfo> {
+    try {
+      const result = await invoke<LocationInfo>("get_location_by_name", {
+        locationName,
+      });
+      console.log(
+        `🔍 Raw API Response - get_location_by_name (${locationName}):`,
+        result
+      );
+      return result;
+    } catch (error) {
+      console.error("Error fetching location by name:", error);
+      throw new Error(`Failed to fetch location by name: ${error}`);
+    }
+  }
+
+  /**
+   * Get current location configuration (primary and secondary)
+   */
+  static async getCurrentLocationConfig(): Promise<LocationConfig> {
+    try {
+      const result = await invoke<LocationConfig>(
+        "get_current_location_config"
+      );
+      console.log(`🔍 Raw API Response - get_current_location_config:`, result);
+      return result;
+    } catch (error) {
+      console.error("Error fetching current location config:", error);
+      throw new Error(`Failed to fetch current location config: ${error}`);
+    }
+  }
 }
 
 // Status API functions
@@ -364,6 +671,8 @@ export class StatusAPI {
 export class TauriAPI {
   static readonly Product = ProductAPI;
   static readonly Inventory = InventoryAPI;
+  static readonly Firebase = FirebaseAPI;
+  static readonly Location = LocationAPI;
   static readonly Status = StatusAPI;
 }
 

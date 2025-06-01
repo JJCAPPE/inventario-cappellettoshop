@@ -38,7 +38,7 @@ const { Panel } = Collapse;
 const version = import.meta.env.VITE_VERSION || "3.0.0";
 
 const HomePage: React.FC = () => {
-  const { fetchLogs, addLog } = useLogs();
+  const { fetchLogs } = useLogs();
   const [query, setQuery] = useState("");
   const [productDetails, setProductDetails] = useState<ProductDetails | null>(
     null
@@ -177,18 +177,38 @@ const HomePage: React.FC = () => {
       const product = await TauriAPI.Product.getProductById(id);
       console.log("✅ HomePage: Product fetched successfully:", product.title);
 
-      // Get inventory levels for all variants to show location-specific data
+      // Start inventory fetch immediately without waiting - this overlaps with processing
       const inventoryItemIds = product.variants.map((v) => v.inventory_item_id);
       console.log(
-        "📊 HomePage: Fetching inventory for items:",
+        "📊 HomePage: Starting inventory fetch for items:",
         inventoryItemIds
       );
 
-      const inventoryLevels =
-        await TauriAPI.Inventory.getInventoryLevelsForLocations(
+      const inventoryPromise =
+        TauriAPI.Inventory.getInventoryLevelsForLocations(
           inventoryItemIds,
           primaryLocation
         );
+
+      // Do synchronous processing while inventory is being fetched in parallel
+      console.log(
+        "🔄 HomePage: Processing product data while inventory loads..."
+      );
+
+      // Check if search was by SKU (synchronous processing)
+      let skuMatchingVariant = null;
+      if (searchQuery && searchQuery.trim()) {
+        console.log("🔍 HomePage: Checking if search was by SKU:", searchQuery);
+        skuMatchingVariant = product.variants.find((backendVariant) => {
+          return (
+            backendVariant.sku &&
+            backendVariant.sku.toLowerCase() === searchQuery.toLowerCase()
+          );
+        });
+      }
+
+      // Now await the inventory data when we actually need it
+      const inventoryLevels = await inventoryPromise;
       console.log(
         "✅ HomePage: Location-aware inventory levels received:",
         inventoryLevels
@@ -244,39 +264,27 @@ const HomePage: React.FC = () => {
       setSecondaryProductDetails(secondaryDetails);
       console.log("✅ HomePage: Product data set successfully");
 
-      // Auto-select variant if search was by SKU
-      if (searchQuery && searchQuery.trim()) {
-        console.log("🔍 HomePage: Checking if search was by SKU:", searchQuery);
+      // Handle SKU auto-selection using pre-computed skuMatchingVariant
+      if (skuMatchingVariant) {
+        // Find the corresponding frontend variant by inventory_item_id
+        const frontendVariant = productDetails.varaintiArticolo.find(
+          (v) => v.inventory_item_id === skuMatchingVariant.inventory_item_id
+        );
 
-        // Check if the search query matches any variant's actual SKU from the backend
-        const skuMatchingVariant = product.variants.find((backendVariant) => {
-          return (
-            backendVariant.sku &&
-            backendVariant.sku.toLowerCase() === searchQuery.toLowerCase()
+        if (frontendVariant && frontendVariant.inventory_quantity > 0) {
+          console.log(
+            "✅ HomePage: Auto-selecting variant with matching SKU:",
+            frontendVariant.title
           );
-        });
-
-        if (skuMatchingVariant) {
-          // Find the corresponding frontend variant by inventory_item_id
-          const frontendVariant = productDetails.varaintiArticolo.find(
-            (v) => v.inventory_item_id === skuMatchingVariant.inventory_item_id
+          setSelectedVariant(frontendVariant.title);
+        } else if (frontendVariant) {
+          console.log(
+            "⚠️ HomePage: Found SKU variant but it has zero inventory:",
+            frontendVariant.title
           );
-
-          if (frontendVariant && frontendVariant.inventory_quantity > 0) {
-            console.log(
-              "✅ HomePage: Auto-selecting variant with matching SKU:",
-              frontendVariant.title
-            );
-            setSelectedVariant(frontendVariant.title);
-          } else if (frontendVariant) {
-            console.log(
-              "⚠️ HomePage: Found SKU variant but it has zero inventory:",
-              frontendVariant.title
-            );
-          }
-        } else {
-          console.log("ℹ️ HomePage: No exact SKU match found in variants");
         }
+      } else if (searchQuery && searchQuery.trim()) {
+        console.log("ℹ️ HomePage: No exact SKU match found in variants");
       }
     } catch (error) {
       console.error("❌ HomePage: Error fetching product:", error);
@@ -343,38 +351,36 @@ const HomePage: React.FC = () => {
             primaryLocation
           );
 
-          // Prepare inventory update (decrease by 1)
-          const inventoryUpdate = {
-            variant_id: variant.inventory_item_id,
-            location_id: locationId,
-            adjustment: -1,
-          };
-
-          console.log("📝 Inventory update:", inventoryUpdate);
-
-          // Perform the inventory adjustment
-          const result = await TauriAPI.Inventory.adjustInventory([
-            inventoryUpdate,
-          ]);
+          // Perform the inventory adjustment with Firebase logging
+          const result = await TauriAPI.Inventory.decreaseInventoryWithLogging(
+            variant.inventory_item_id,
+            locationId,
+            productDetails.id,
+            selectedVariant,
+            productDetails.nomeArticolo,
+            productDetails.prezzo,
+            primaryLocation,
+            productDetails.immaginiArticolo
+          );
           console.log("✅ Inventory adjustment successful:", result);
 
-          // Add log entry for successful operation
-          const logEntry = {
-            requestType: "Rettifica",
-            timestamp: new Date().toISOString(),
-            data: {
-              id: productDetails.id,
-              variant: selectedVariant,
-              negozio: primaryLocation,
-              inventory_item_id: variant.inventory_item_id,
-              nome: productDetails.nomeArticolo,
-              prezzo: productDetails.prezzo,
-              rettifica: -1,
-              images: productDetails.immaginiArticolo,
-            },
-          };
+          // Remove the old manual log entry since Firebase handles it now
+          // const logEntry = {
+          //   requestType: "Rettifica",
+          //   timestamp: new Date().toISOString(),
+          //   data: {
+          //     id: productDetails.id,
+          //     variant: selectedVariant,
+          //     negozio: primaryLocation,
+          //     inventory_item_id: variant.inventory_item_id,
+          //     nome: productDetails.nomeArticolo,
+          //     prezzo: productDetails.prezzo,
+          //     rettifica: -1,
+          //     images: productDetails.immaginiArticolo,
+          //   },
+          // };
 
-          addLog(logEntry);
+          // addLog(logEntry);
           await fetchLogs();
 
           // Refresh product data to show updated inventory
@@ -430,38 +436,36 @@ const HomePage: React.FC = () => {
 
       console.log("📍 Using location ID:", locationId, "for", primaryLocation);
 
-      // Prepare inventory update (increase by 1 to undo)
-      const inventoryUpdate = {
-        variant_id: variant.inventory_item_id,
-        location_id: locationId,
-        adjustment: +1,
-      };
-
-      console.log("📝 Inventory undo update:", inventoryUpdate);
-
-      // Perform the inventory adjustment
-      const result = await TauriAPI.Inventory.adjustInventory([
-        inventoryUpdate,
-      ]);
+      // Perform the inventory undo adjustment with Firebase logging
+      const result = await TauriAPI.Inventory.undoDecreaseInventoryWithLogging(
+        variant.inventory_item_id,
+        locationId,
+        productDetails.id,
+        selectedVariant,
+        productDetails.nomeArticolo,
+        productDetails.prezzo,
+        primaryLocation,
+        productDetails.immaginiArticolo
+      );
       console.log("✅ Inventory undo successful:", result);
 
-      // Add undo log entry
-      const logEntry = {
-        requestType: "Annullamento",
-        timestamp: new Date().toISOString(),
-        data: {
-          id: productDetails.id,
-          variant: selectedVariant,
-          negozio: primaryLocation,
-          inventory_item_id: variant.inventory_item_id,
-          nome: productDetails.nomeArticolo,
-          prezzo: productDetails.prezzo,
-          rettifica: +1,
-          images: productDetails.immaginiArticolo,
-        },
-      };
+      // Remove the old manual log entry since Firebase handles it now
+      // const logEntry = {
+      //   requestType: "Annullamento",
+      //   timestamp: new Date().toISOString(),
+      //   data: {
+      //     id: productDetails.id,
+      //     variant: selectedVariant,
+      //     negozio: primaryLocation,
+      //     inventory_item_id: variant.inventory_item_id,
+      //     nome: productDetails.nomeArticolo,
+      //     prezzo: productDetails.prezzo,
+      //     rettifica: +1,
+      //     images: productDetails.immaginiArticolo,
+      //   },
+      // };
 
-      addLog(logEntry);
+      // addLog(logEntry);
       await fetchLogs();
 
       // Refresh product data to show updated inventory
