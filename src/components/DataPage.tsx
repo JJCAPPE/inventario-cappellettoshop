@@ -83,9 +83,21 @@ const DataPage: React.FC = () => {
           marginBottom: 16,
         }}
       >
-        <Title level={4} style={{ margin: 0 }}>
-          Modifiche Recenti (Ultime 24h) - {currentLocation}
-        </Title>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <Tag
+            className="location-tag"
+            style={{
+              fontSize: 14,
+              padding: "4px 12px",
+              backgroundColor: "#492513",
+              color: "#FFF2E3",
+              border: "1px solid #492513",
+              fontWeight: "bold",
+            }}
+          >
+            {currentLocation}
+          </Tag>
+        </div>
         <Button
           icon={<ReloadOutlined />}
           onClick={handleRefresh}

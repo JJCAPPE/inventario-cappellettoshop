@@ -1,3 +1,155 @@
+/* Custom color theme using the user's selected colors */
+
+:root {
+    --ant-primary-color: #492513;
+    --ant-primary-color-hover: #5a2e18;
+    --ant-primary-color-active: #3a1e0f;
+    --ant-primary-color-outline: rgba(73, 37, 19, 0.2);
+    --ant-primary-1: #fff2e3;
+    --ant-primary-2: #ffe8d1;
+    --ant-primary-3: #ffd9b3;
+    --ant-primary-4: #ffca95;
+    --ant-primary-5: #ccac7a;
+    --ant-primary-6: #492513;
+    --ant-primary-7: #3a1e0f;
+}
+
+
+/* Apply custom colors to Ant Design components */
+
+.ant-btn-primary {
+    background-color: #492513 !important;
+    border-color: #492513 !important;
+}
+
+.ant-btn-primary:hover {
+    background-color: #5a2e18 !important;
+    border-color: #5a2e18 !important;
+}
+
+.ant-btn-primary:focus,
+.ant-btn-primary:active {
+    background-color: #3a1e0f !important;
+    border-color: #3a1e0f !important;
+}
+
+
+/* Special styling for the Modifiche button */
+
+.modifiche-button-active {
+    background-color: #FFF2E3 !important;
+    border-color: #FFF2E3 !important;
+    color: #492513 !important;
+}
+
+.modifiche-button-active:hover {
+    background-color: #FFE8D1 !important;
+    border-color: #FFE8D1 !important;
+    color: #492513 !important;
+}
+
+.modifiche-button-active:focus,
+.modifiche-button-active:active {
+    background-color: #FFD9B3 !important;
+    border-color: #FFD9B3 !important;
+    color: #492513 !important;
+}
+
+
+/* Header background color update */
+
+.ant-layout-header {
+    background: #492513 !important;
+}
+
+
+/* Primary text color for emphasis */
+
+.ant-typography-title {
+    color: #492513 !important;
+}
+
+
+/* Selection and link colors */
+
+.ant-anchor-link-active>.ant-anchor-link-title,
+.ant-anchor-link-title:hover {
+    color: #492513 !important;
+}
+
+.ant-table-tbody>tr.ant-table-row-selected>td {
+    background-color: #fff2e3 !important;
+}
+
+
+/* Switch and checkbox primary colors */
+
+.ant-switch-checked {
+    background-color: #492513 !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+    background-color: #492513 !important;
+    border-color: #492513 !important;
+}
+
+
+/* Progress bar colors */
+
+.ant-progress-bg {
+    background-color: #492513 !important;
+}
+
+
+/* Custom styling for price and status tags */
+
+.ant-tag:has-text("€") {
+    font-weight: bold !important;
+}
+
+
+/* Alternative approach - target the price tag specifically */
+
+.price-tag {
+    font-weight: bold !important;
+}
+
+
+/* Override Ant Design tag colors with high specificity */
+
+.ant-tag.ant-tag-blue,
+.ant-tag.ant-tag-blue.price-tag {
+    background-color: #492513 !important;
+    color: #FFF2E3 !important;
+    border-color: #492513 !important;
+    font-weight: bold !important;
+}
+
+.ant-tag.ant-tag-success {
+    background-color: #FFF2E3 !important;
+    color: #492513 !important;
+    border-color: #492513 !important;
+    font-weight: normal !important;
+}
+
+.ant-tag.ant-tag-warning {
+    background-color: #FFF2E3 !important;
+    color: #492513 !important;
+    border-color: #492513 !important;
+    font-weight: normal !important;
+}
+
+
+/* Location tag styling */
+
+.location-tag {
+    background-color: #492513 !important;
+    color: #FFF2E3 !important;
+    border-color: #492513 !important;
+    font-weight: bold !important;
+}
+
+
 /* Essential app layout only - no component overrides */
 
 

@@ -534,7 +534,7 @@ const HomePage: React.FC = () => {
     <div style={{ padding: 24 }}>
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
-          <Badge count={version} color="#1890ff" />
+          <Badge count={version} color="#FFF2E3" style={{ color: "#492513" }} />
         </Col>
       </Row>
 
@@ -605,6 +605,7 @@ const HomePage: React.FC = () => {
                 <Col>
                   <Tag
                     color="blue"
+                    className="price-tag"
                     style={{ fontSize: 16, padding: "4px 12px" }}
                   >
                     € {productDetails.prezzo}
@@ -802,7 +803,7 @@ const HomePage: React.FC = () => {
               >
                 Visualizza su Shopify
               </Button>
-              <Button
+              {/*<Button
                 type="primary"
                 icon={<GlobalOutlined />}
                 onClick={handleViewOnShop}
@@ -810,7 +811,7 @@ const HomePage: React.FC = () => {
                 size="large"
               >
                 Visualizza su Shop
-              </Button>
+              </Button>*/}
             </Space>
           </Col>
         </Row>
