@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{Utc, Local};
+use chrono::{Utc};
 use crate::utils::{AppConfig, StatusResponse};
 use reqwest::Client;
 use chrono::DateTime;
@@ -37,10 +37,10 @@ struct FirestoreDocument {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 enum FirestoreValue {
-    StringValue { stringValue: String },
-    IntegerValue { integerValue: String },
-    ArrayValue { arrayValue: ArrayValues },
-    MapValue { mapValue: MapValues },
+    StringValue { string_value: String },
+    IntegerValue { integer_value: String },
+    ArrayValue { array_value: ArrayValues },
+    MapValue { map_value: MapValues },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -334,7 +334,7 @@ impl FirebaseClient {
         fields.insert(
             "requestType".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.request_type.clone(),
+                string_value: log_entry.request_type.clone(),
             },
         );
 
@@ -342,7 +342,7 @@ impl FirebaseClient {
         fields.insert(
             "timestamp".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.timestamp.clone(),
+                string_value: log_entry.timestamp.clone(),
             },
         );
 
@@ -353,63 +353,63 @@ impl FirebaseClient {
         data_fields.insert(
             "id".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.data.id.clone(),
+                string_value: log_entry.data.id.clone(),
             },
         );
         
         data_fields.insert(
             "variant".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.data.variant.clone(),
+                string_value: log_entry.data.variant.clone(),
             },
         );
         
         data_fields.insert(
             "negozio".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.data.negozio.clone(),
+                string_value: log_entry.data.negozio.clone(),
             },
         );
         
         data_fields.insert(
             "inventory_item_id".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.data.inventory_item_id.clone(),
+                string_value: log_entry.data.inventory_item_id.clone(),
             },
         );
         
         data_fields.insert(
             "nome".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.data.nome.clone(),
+                string_value: log_entry.data.nome.clone(),
             },
         );
         
         data_fields.insert(
             "prezzo".to_string(),
             FirestoreValue::StringValue {
-                stringValue: log_entry.data.prezzo.clone(),
+                string_value: log_entry.data.prezzo.clone(),
             },
         );
         
         data_fields.insert(
             "rettifica".to_string(),
             FirestoreValue::IntegerValue {
-                integerValue: log_entry.data.rettifica.to_string(),
+                integer_value: log_entry.data.rettifica.to_string(),
             },
         );
         
         // Convert images array to Firestore array format
         let image_values: Vec<FirestoreValue> = log_entry.data.images.iter()
             .map(|img| FirestoreValue::StringValue {
-                stringValue: img.clone(),
+                string_value: img.clone(),
             })
             .collect();
         
         data_fields.insert(
             "images".to_string(),
             FirestoreValue::ArrayValue {
-                arrayValue: ArrayValues {
+                array_value: ArrayValues {
                     values: image_values,
                 },
             },
@@ -419,7 +419,7 @@ impl FirebaseClient {
         fields.insert(
             "data".to_string(),
             FirestoreValue::MapValue {
-                mapValue: MapValues {
+                map_value: MapValues {
                     fields: data_fields,
                 },
             },
