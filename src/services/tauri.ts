@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 export interface Product {
   id: string;
   title: string;
+  handle: string;
   price: string;
   description: string;
   images: string[];

@@ -1,6 +1,7 @@
 export interface ProductDetails {
   nomeArticolo: string;
   id: string;
+  handle: string;
   prezzo: string;
   descrizioneArticolo: string;
   immaginiArticolo: string[];

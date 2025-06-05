@@ -1,9 +1,9 @@
+use crate::utils::{AppConfig, StatusResponse};
+use chrono::DateTime;
+use chrono::Utc;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{Utc};
-use crate::utils::{AppConfig, StatusResponse};
-use reqwest::Client;
-use chrono::DateTime;
 
 // ============================================================================
 // DATA STRUCTURES FOR FIREBASE LOGGING
@@ -69,7 +69,7 @@ impl FirebaseClient {
             "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents",
             config.firebase_project_id
         );
-        
+
         Self {
             client: Client::new(),
             config,
@@ -83,14 +83,15 @@ impl FirebaseClient {
         println!("   📝 Request Type: {}", log_entry.request_type);
         println!("   🏪 Store: {}", log_entry.data.negozio);
         println!("   📦 Product: {}", log_entry.data.nome);
-        
+
         let collection_url = format!("{}/logs", self.firestore_url);
         println!("   🌐 Firebase URL: {}", collection_url);
-        
+
         // Convert LogEntry to Firestore document format
         let firestore_doc = self.log_entry_to_firestore_doc(&log_entry)?;
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post(&collection_url)
             .header("Content-Type", "application/json")
             .query(&[("key", &self.config.firebase_api_key)])
@@ -106,9 +107,11 @@ impl FirebaseClient {
 
         if response.status().is_success() {
             // Parse the response to get the document ID
-            let response_data: serde_json::Value = response.json().await
+            let response_data: serde_json::Value = response
+                .json()
+                .await
                 .map_err(|e| format!("Failed to parse Firestore response: {}", e))?;
-            
+
             // Extract document ID from the response
             let document_id = if let Some(name) = response_data["name"].as_str() {
                 // Extract ID from path like "projects/PROJECT_ID/databases/(default)/documents/logs/DOCUMENT_ID"
@@ -116,23 +119,30 @@ impl FirebaseClient {
             } else {
                 "unknown".to_string()
             };
-            
+
             println!("✅ Firebase log created successfully!");
             println!("   📄 Document ID: {}", document_id);
-            
+
             Ok(StatusResponse {
                 status: "success".to_string(),
                 message: format!("Log entry created successfully with ID: {}", document_id),
             })
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             println!("❌ Firebase error: {}", error_text);
             Err(format!("Firestore error: {}", error_text))
         }
     }
 
     /// Get logs from Firestore with filtering
-    pub async fn get_logs(&self, query_param: Option<String>, negozio: String) -> Result<Vec<LogEntry>, String> {
+    pub async fn get_logs(
+        &self,
+        query_param: Option<String>,
+        negozio: String,
+    ) -> Result<Vec<LogEntry>, String> {
         println!("🔍 Getting logs from Firestore for location: {}", negozio);
         println!("📝 Query parameter: {:?}", query_param);
 
@@ -140,17 +150,20 @@ impl FirebaseClient {
         // ShopifyReact uses: new Date().toISOString().split("T")[0]
         let now = chrono::Local::now();
         let today = now.format("%Y-%m-%d").to_string();
-        
+
         // Create the upper bound with Unicode character (same as ShopifyReact)
         // Note: We need to be careful with Unicode serialization
         let today_upper = format!("{}￿", today); // Using the actual Unicode character instead of escape
-        
-        println!("📅 Filtering for today: {} (upper bound: {})", today, today_upper);
+
+        println!(
+            "📅 Filtering for today: {} (upper bound: {})",
+            today, today_upper
+        );
         println!("📅 Using local timezone date instead of UTC");
 
         // Use the runQuery endpoint with proper timestamp filtering
         let url = format!("{}:runQuery", self.firestore_url);
-        
+
         println!("🌐 Firestore query URL: {}", url);
 
         // Create the query with proper Unicode handling
@@ -195,9 +208,14 @@ impl FirebaseClient {
             }
         });
 
-        println!("📋 Query body with timestamp filtering: {}", serde_json::to_string_pretty(&query_body).unwrap_or_else(|_| "Unable to serialize".to_string()));
+        println!(
+            "📋 Query body with timestamp filtering: {}",
+            serde_json::to_string_pretty(&query_body)
+                .unwrap_or_else(|_| "Unable to serialize".to_string())
+        );
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .query(&[("key", &self.config.firebase_api_key)])
@@ -209,20 +227,37 @@ impl FirebaseClient {
         println!("📡 Firebase response status: {}", response.status());
 
         if response.status().is_success() {
-            let firestore_response: serde_json::Value = response.json().await
+            let firestore_response: serde_json::Value = response
+                .json()
+                .await
                 .map_err(|e| format!("Failed to parse Firestore response: {}", e))?;
 
-            println!("📋 Raw Firestore response structure: {}", serde_json::to_string_pretty(&firestore_response).unwrap_or_else(|_| "Unable to serialize".to_string()));
+            println!(
+                "📋 Raw Firestore response structure: {}",
+                serde_json::to_string_pretty(&firestore_response)
+                    .unwrap_or_else(|_| "Unable to serialize".to_string())
+            );
 
             // Parse logs with the fixed parsing method
-            let all_logs = self.parse_firestore_runquery_response(firestore_response, &query_param)?;
-            println!("✅ Found {} logs for location {} within date range", all_logs.len(), negozio);
+            let all_logs =
+                self.parse_firestore_runquery_response(firestore_response, &query_param)?;
+            println!(
+                "✅ Found {} logs for location {} within date range",
+                all_logs.len(),
+                negozio
+            );
 
             // Print some sample logs for debugging
             if !all_logs.is_empty() {
                 println!("📊 Sample log timestamps:");
                 for (i, log) in all_logs.iter().take(5).enumerate() {
-                    println!("  {}. {} - {} - {}", i+1, log.timestamp, log.data.negozio, log.data.nome);
+                    println!(
+                        "  {}. {} - {} - {}",
+                        i + 1,
+                        log.timestamp,
+                        log.data.negozio,
+                        log.data.nome
+                    );
                 }
             } else {
                 println!("ℹ️ No logs found for today ({})", today);
@@ -234,25 +269,40 @@ impl FirebaseClient {
 
             Ok(all_logs)
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             println!("❌ Firebase error response: {}", error_text);
             Err(format!("Failed to get logs: {}", error_text))
         }
     }
 
     /// Get logs from Firestore with date range filtering (for statistics)
-    pub async fn get_logs_date_range(&self, query_param: Option<String>, negozio: String, start_date: String, end_date: String) -> Result<Vec<LogEntry>, String> {
-        println!("🔍 Getting logs from Firestore for location: {} with date range: {} to {}", negozio, start_date, end_date);
+    pub async fn get_logs_date_range(
+        &self,
+        query_param: Option<String>,
+        negozio: String,
+        start_date: String,
+        end_date: String,
+    ) -> Result<Vec<LogEntry>, String> {
+        println!(
+            "🔍 Getting logs from Firestore for location: {} with date range: {} to {}",
+            negozio, start_date, end_date
+        );
         println!("📝 Query parameter: {:?}", query_param);
 
         // Create the upper bound with Unicode character for end date
         let end_date_upper = format!("{}￿", end_date);
-        
-        println!("📅 Filtering from: {} to: {} (upper bound: {})", start_date, end_date, end_date_upper);
+
+        println!(
+            "📅 Filtering from: {} to: {} (upper bound: {})",
+            start_date, end_date, end_date_upper
+        );
 
         // Use the runQuery endpoint with proper timestamp filtering
         let url = format!("{}:runQuery", self.firestore_url);
-        
+
         println!("🌐 Firestore query URL: {}", url);
 
         // Create the query with date range filtering
@@ -297,9 +347,14 @@ impl FirebaseClient {
             }
         });
 
-        println!("📋 Query body with date range filtering: {}", serde_json::to_string_pretty(&query_body).unwrap_or_else(|_| "Unable to serialize".to_string()));
+        println!(
+            "📋 Query body with date range filtering: {}",
+            serde_json::to_string_pretty(&query_body)
+                .unwrap_or_else(|_| "Unable to serialize".to_string())
+        );
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .query(&[("key", &self.config.firebase_api_key)])
@@ -311,23 +366,38 @@ impl FirebaseClient {
         println!("📡 Firebase response status: {}", response.status());
 
         if response.status().is_success() {
-            let firestore_response: serde_json::Value = response.json().await
+            let firestore_response: serde_json::Value = response
+                .json()
+                .await
                 .map_err(|e| format!("Failed to parse Firestore response: {}", e))?;
 
             // Parse logs with the existing parsing method
-            let all_logs = self.parse_firestore_runquery_response(firestore_response, &query_param)?;
-            println!("✅ Found {} logs for location {} within date range {} to {}", all_logs.len(), negozio, start_date, end_date);
+            let all_logs =
+                self.parse_firestore_runquery_response(firestore_response, &query_param)?;
+            println!(
+                "✅ Found {} logs for location {} within date range {} to {}",
+                all_logs.len(),
+                negozio,
+                start_date,
+                end_date
+            );
 
             Ok(all_logs)
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             println!("❌ Firebase error response: {}", error_text);
             Err(format!("Failed to get logs: {}", error_text))
         }
     }
 
     /// Convert LogEntry to Firestore document format
-    fn log_entry_to_firestore_doc(&self, log_entry: &LogEntry) -> Result<FirestoreDocument, String> {
+    fn log_entry_to_firestore_doc(
+        &self,
+        log_entry: &LogEntry,
+    ) -> Result<FirestoreDocument, String> {
         let mut fields = HashMap::new();
 
         // Add requestType
@@ -348,7 +418,7 @@ impl FirebaseClient {
 
         // Add data object as separate nested fields (not as JSON string)
         let mut data_fields = HashMap::new();
-        
+
         // Add individual data fields
         data_fields.insert(
             "id".to_string(),
@@ -356,56 +426,59 @@ impl FirebaseClient {
                 string_value: log_entry.data.id.clone(),
             },
         );
-        
+
         data_fields.insert(
             "variant".to_string(),
             FirestoreValue::StringValue {
                 string_value: log_entry.data.variant.clone(),
             },
         );
-        
+
         data_fields.insert(
             "negozio".to_string(),
             FirestoreValue::StringValue {
                 string_value: log_entry.data.negozio.clone(),
             },
         );
-        
+
         data_fields.insert(
             "inventory_item_id".to_string(),
             FirestoreValue::StringValue {
                 string_value: log_entry.data.inventory_item_id.clone(),
             },
         );
-        
+
         data_fields.insert(
             "nome".to_string(),
             FirestoreValue::StringValue {
                 string_value: log_entry.data.nome.clone(),
             },
         );
-        
+
         data_fields.insert(
             "prezzo".to_string(),
             FirestoreValue::StringValue {
                 string_value: log_entry.data.prezzo.clone(),
             },
         );
-        
+
         data_fields.insert(
             "rettifica".to_string(),
             FirestoreValue::IntegerValue {
                 integer_value: log_entry.data.rettifica.to_string(),
             },
         );
-        
+
         // Convert images array to Firestore array format
-        let image_values: Vec<FirestoreValue> = log_entry.data.images.iter()
+        let image_values: Vec<FirestoreValue> = log_entry
+            .data
+            .images
+            .iter()
             .map(|img| FirestoreValue::StringValue {
                 string_value: img.clone(),
             })
             .collect();
-        
+
         data_fields.insert(
             "images".to_string(),
             FirestoreValue::ArrayValue {
@@ -435,11 +508,12 @@ impl FirebaseClient {
         query_param: &Option<String>,
     ) -> Result<Vec<LogEntry>, String> {
         // The runQuery response is an array where each item has a "document" field
-        let response_array = response
-            .as_array()
-            .ok_or("Response is not an array")?;
+        let response_array = response.as_array().ok_or("Response is not an array")?;
 
-        println!("📊 Found {} items in Firestore runQuery response", response_array.len());
+        println!(
+            "📊 Found {} items in Firestore runQuery response",
+            response_array.len()
+        );
 
         let mut logs = Vec::new();
 
@@ -449,7 +523,12 @@ impl FirebaseClient {
                 if let Ok(log_entry) = self.parse_firestore_document(document) {
                     // Apply client-side filtering by product name (same as ShopifyReact)
                     if let Some(query) = query_param {
-                        if !log_entry.data.nome.to_lowercase().contains(&query.to_lowercase()) {
+                        if !log_entry
+                            .data
+                            .nome
+                            .to_lowercase()
+                            .contains(&query.to_lowercase())
+                        {
                             continue;
                         }
                     }
@@ -460,13 +539,16 @@ impl FirebaseClient {
         }
 
         println!("✅ Successfully parsed {} logs after filtering", logs.len());
-        
+
         // Note: Firestore query already handles sorting, but ensure consistency
         logs.sort_by(|a, b| {
             // Try to parse as RFC3339 first, then fallback to string comparison
-            match (DateTime::parse_from_rfc3339(&a.timestamp), DateTime::parse_from_rfc3339(&b.timestamp)) {
+            match (
+                DateTime::parse_from_rfc3339(&a.timestamp),
+                DateTime::parse_from_rfc3339(&b.timestamp),
+            ) {
                 (Ok(a_time), Ok(b_time)) => b_time.cmp(&a_time), // Descending order
-                _ => b.timestamp.cmp(&a.timestamp), // Fallback to string comparison
+                _ => b.timestamp.cmp(&a.timestamp),              // Fallback to string comparison
             }
         });
 
@@ -518,7 +600,12 @@ impl FirebaseClient {
 
         let inventory_item_id = data_map
             .get("inventory_item_id")
-            .and_then(|v| v["stringValue"].as_str())
+            .and_then(|v| {
+                // Handle both stringValue and integerValue formats
+                v["stringValue"]
+                    .as_str()
+                    .or_else(|| v["integerValue"].as_str())
+            })
             .ok_or("Missing data.inventory_item_id")?
             .to_string();
 
@@ -582,13 +669,13 @@ pub async fn create_log(
     config: tauri::State<'_, AppConfig>,
 ) -> Result<StatusResponse, String> {
     let firebase_client = FirebaseClient::new(config.inner().clone());
-    
+
     let log_entry = LogEntry {
         request_type,
         data,
         timestamp: Utc::now().to_rfc3339(),
     };
-    
+
     firebase_client.create_log(log_entry).await
 }
 
@@ -611,7 +698,9 @@ pub async fn get_logs_date_range(
     config: tauri::State<'_, AppConfig>,
 ) -> Result<Vec<LogEntry>, String> {
     let firebase_client = FirebaseClient::new(config.inner().clone());
-    firebase_client.get_logs_date_range(query, location, start_date, end_date).await
+    firebase_client
+        .get_logs_date_range(query, location, start_date, end_date)
+        .await
 }
 
 #[tauri::command]
@@ -646,4 +735,4 @@ pub fn create_inventory_log_data(
         rettifica: adjustment,
         images,
     }
-} 
+}
