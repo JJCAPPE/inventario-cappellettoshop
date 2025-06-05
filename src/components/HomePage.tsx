@@ -239,6 +239,7 @@ const HomePage: React.FC = () => {
           inventory_quantity: variant.inventory_quantity,
         })),
         recentlyModified: false, // TODO: Implement recently modified logic
+        handle: product.handle,
       };
 
       console.log("📦 HomePage: Converted product details:", productDetails);
@@ -504,13 +505,8 @@ const HomePage: React.FC = () => {
 
   const handleViewOnShop = async () => {
     if (productDetails) {
-      // Convert product title to handle format (lowercase, spaces to dashes, remove special chars)
-      const productHandle = productDetails.nomeArticolo
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9\-]/g, "");
-
-      const url = `https://cappelletto.myshopify.com/products/${productHandle}`;
+      // Use the actual Shopify handle from the product data
+      const url = `https://www.cappellettoshop.com/products/${productDetails.handle}`;
       try {
         await openUrl(url);
       } catch (error) {
@@ -793,25 +789,23 @@ const HomePage: React.FC = () => {
               </Panel>
             </Collapse>
 
-            <Space direction="vertical" style={{ width: "100%" }}>
+            <Space direction="horizontal" style={{ width: "100%" }}>
               <Button
                 type="default"
                 icon={<ShopOutlined />}
                 onClick={handleViewOnShopify}
-                block
                 size="large"
               >
                 Visualizza su Shopify
               </Button>
-              {/*<Button
+              <Button
                 type="primary"
                 icon={<GlobalOutlined />}
                 onClick={handleViewOnShop}
-                block
                 size="large"
               >
                 Visualizza su Shop
-              </Button>*/}
+              </Button>
             </Space>
           </Col>
         </Row>

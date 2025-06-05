@@ -181,14 +181,14 @@ const DataPage: React.FC = () => {
                     {log.data.images && log.data.images[0] ? (
                       <Avatar
                         src={log.data.images[0]}
-                        size={48}
+                        size={128}
                         shape="square"
                         style={{ marginBottom: 4 }}
                       />
                     ) : (
                       <Avatar
                         icon={getRequestTypeIcon()}
-                        size={48}
+                        size={129}
                         shape="square"
                         style={{ marginBottom: 4 }}
                       />

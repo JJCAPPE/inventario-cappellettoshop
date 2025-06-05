@@ -140,6 +140,25 @@ function App() {
     };
   }, [sidebarVisible]);
 
+  // Keyboard shortcut for toggling logs panel (Cmd+M)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Cmd+M (metaKey is Cmd on Mac, ctrlKey on Windows/Linux)
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "m") {
+        event.preventDefault(); // Prevent default browser behavior
+        console.log(
+          "⌨️ Keyboard shortcut triggered: Cmd+M - toggling logs panel"
+        );
+        handleDataPanelToggle(event as any); // Cast to React.MouseEvent for compatibility
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [sidebarVisible]); // Include sidebarVisible as dependency since handleDataPanelToggle uses it
+
   const renderSidebarContent = () => {
     switch (currentView) {
       case "data":

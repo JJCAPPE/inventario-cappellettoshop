@@ -1,10 +1,12 @@
-use inventario_cappellettoshop_lib::utils::{AppConfig, Product, ProductVariant, InventoryUpdate, StatusResponse};
+use inventario_cappellettoshop_lib::utils::{
+    AppConfig, InventoryUpdate, Product, ProductVariant, StatusResponse,
+};
+use inventario_cappellettoshop_lib::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
 use std::time::Duration;
 use tokio::time::sleep;
-use inventario_cappellettoshop_lib::*;
 
 // ============================================================================
 // CONFIGURATION TESTS
@@ -22,7 +24,7 @@ fn test_config_from_env_success() {
     // Test that AppConfig::from_env succeeds when .env file has all required variables
     let result = AppConfig::from_env();
     assert!(result.is_ok());
-    
+
     let config = result.unwrap();
     assert!(!config.shop_domain.is_empty());
     assert!(!config.access_token.is_empty());
@@ -53,9 +55,12 @@ fn test_config_api_url_generation() {
         github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     };
-    
+
     let url = config.get_api_url("products.json");
-    assert_eq!(url, "https://test-shop.myshopify.com/admin/api/2025-01/products.json");
+    assert_eq!(
+        url,
+        "https://test-shop.myshopify.com/admin/api/2025-01/products.json"
+    );
 }
 
 #[test]
@@ -80,7 +85,7 @@ fn test_config_headers() {
         github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     };
-    
+
     let headers = config.get_headers();
     assert!(headers.contains_key("X-Shopify-Access-Token"));
     assert!(headers.contains_key("Content-Type"));
@@ -99,10 +104,11 @@ fn test_product_creation() {
         price: "19.99".to_string(),
         sku: Some("TEST-SKU".to_string()),
     };
-    
+
     let product = Product {
         id: "1".to_string(),
         title: "Test Product".to_string(),
+        handle: "test-product".to_string(),
         price: "19.99".to_string(),
         description: "A test product".to_string(),
         images: vec!["https://example.com/image.jpg".to_string()],
@@ -110,7 +116,7 @@ fn test_product_creation() {
         total_inventory: 10,
         locations: HashMap::new(),
     };
-    
+
     assert_eq!(product.title, "Test Product");
     assert_eq!(product.variants.len(), 1);
     assert_eq!(product.variants[0].inventory_quantity, 10);
@@ -123,7 +129,7 @@ fn test_inventory_update_creation() {
         location_id: "67890".to_string(),
         adjustment: -5,
     };
-    
+
     assert_eq!(update.adjustment, -5);
     assert_eq!(update.variant_id, "12345");
 }
@@ -134,7 +140,7 @@ fn test_status_response_creation() {
         status: "success".to_string(),
         message: "Operation completed".to_string(),
     };
-    
+
     assert_eq!(response.status, "success");
     assert_eq!(response.message, "Operation completed");
 }
@@ -169,11 +175,11 @@ fn test_parse_shopify_product_response() {
             }
         ]
     });
-    
+
     // Test that we can parse the JSON structure
     let products = sample_response["products"].as_array().unwrap();
     assert_eq!(products.len(), 1);
-    
+
     let product = &products[0];
     assert_eq!(product["title"].as_str().unwrap(), "Test Product");
     assert_eq!(product["variants"].as_array().unwrap().len(), 1);
@@ -195,10 +201,10 @@ fn test_parse_inventory_levels_response() {
             }
         ]
     });
-    
+
     let levels = sample_response["inventory_levels"].as_array().unwrap();
     assert_eq!(levels.len(), 2);
-    
+
     let level1 = &levels[0];
     assert_eq!(level1["available"].as_i64().unwrap(), 25);
 }
@@ -219,7 +225,7 @@ fn test_parse_low_stock_response() {
                     },
                     {
                         "id": 987654322,
-                        "title": "Size M", 
+                        "title": "Size M",
                         "inventory_quantity": 15,
                         "sku": "NORMAL-STOCK-M"
                     }
@@ -227,18 +233,16 @@ fn test_parse_low_stock_response() {
             }
         ]
     });
-    
+
     // Test filtering logic for low stock (threshold = 5)
     let products = sample_response["products"].as_array().unwrap();
     let variants = products[0]["variants"].as_array().unwrap();
-    
+
     let low_stock_variants: Vec<&Value> = variants
         .iter()
-        .filter(|variant| {
-            variant["inventory_quantity"].as_i64().unwrap_or(0) <= 5
-        })
+        .filter(|variant| variant["inventory_quantity"].as_i64().unwrap_or(0) <= 5)
         .collect();
-    
+
     assert_eq!(low_stock_variants.len(), 1);
     assert_eq!(low_stock_variants[0]["title"].as_str().unwrap(), "Size S");
 }
@@ -275,7 +279,7 @@ fn test_integration_config_setup() {
     let config = setup_test_config();
     assert_eq!(config.shop_domain, "test-shop.myshopify.com");
     assert_eq!(config.api_version, "2025-01");
-    
+
     let url = config.get_api_url("shop.json");
     assert!(url.contains("test-shop.myshopify.com"));
     assert!(url.contains("2025-01"));
@@ -289,7 +293,7 @@ fn test_integration_config_setup() {
 fn test_firebase_config_helper() {
     let config = setup_test_config();
     let firebase_config = config.get_firebase_config();
-    
+
     assert_eq!(firebase_config.api_key, "test-firebase-key");
     assert_eq!(firebase_config.project_id, "test-project");
     assert_eq!(firebase_config.auth_domain, "test.firebaseapp.com");
@@ -299,7 +303,7 @@ fn test_firebase_config_helper() {
 fn test_github_config_helper() {
     let config = setup_test_config();
     let github_config = config.get_github_config();
-    
+
     assert_eq!(github_config.token, "test-github-token");
     assert_eq!(github_config.owner, "test-owner");
     assert_eq!(github_config.repo, "test-repo");
@@ -315,7 +319,7 @@ fn test_missing_product_fields() {
         "title": "Product Without ID"
         // Missing required "id" field
     });
-    
+
     // Test that missing ID would cause an error
     let id_result = invalid_product["id"].as_u64();
     assert!(id_result.is_none());
@@ -328,16 +332,16 @@ fn test_empty_variants_array() {
         "title": "Product Without Variants",
         "variants": []
     });
-    
+
     let variants = product_with_no_variants["variants"].as_array().unwrap();
     assert_eq!(variants.len(), 0);
-    
+
     // Test that empty variants array is handled gracefully
     let total_inventory: i32 = variants
         .iter()
         .map(|v| v["inventory_quantity"].as_i64().unwrap_or(0) as i32)
         .sum();
-    
+
     assert_eq!(total_inventory, 0);
 }
 
@@ -346,7 +350,7 @@ fn test_malformed_json_handling() {
     let malformed_json = json!({
         "products": "this should be an array"
     });
-    
+
     let products_result = malformed_json["products"].as_array();
     assert!(products_result.is_none());
 }
@@ -374,21 +378,21 @@ fn test_large_product_list_parsing() {
             ]
         }));
     }
-    
+
     let large_response = json!({
         "products": products
     });
-    
+
     let parsed_products = large_response["products"].as_array().unwrap();
     assert_eq!(parsed_products.len(), 100);
-    
+
     // Test that we can efficiently process all products
     let total_inventory: i64 = parsed_products
         .iter()
         .flat_map(|p| p["variants"].as_array().unwrap())
         .map(|v| v["inventory_quantity"].as_i64().unwrap_or(0))
         .sum();
-    
+
     assert!(total_inventory > 0);
 }
 
@@ -415,7 +419,7 @@ fn test_config_validation() {
         github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     };
-    
+
     // Test that all fields are properly set
     assert_eq!(config.shop_domain, "test-shop.myshopify.com");
     assert_eq!(config.access_token, "test-token");
@@ -563,4 +567,4 @@ impl Default for TestImage {
             version: "3.0.0".to_string(),
         }
     }
-} 
+}
