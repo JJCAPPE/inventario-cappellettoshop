@@ -25,12 +25,14 @@ import {
   CloseOutlined,
   SettingOutlined,
   GlobalOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import SearchBar from "./SearchBar";
-import { ProductDetails, SecondaryDetails } from "../types";
+import { ProductDetails, SecondaryDetails } from "../types/index";
 import { useLogs } from "../contexts/LogContext";
 import TauriAPI from "../services/tauri";
+import ModificationHistoryModal from "./ModificationHistoryModal";
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -53,6 +55,8 @@ const HomePage: React.FC = () => {
   const [modifyModalVisible, setModifyModalVisible] = useState(false);
   const [undoModalVisible, setUndoModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
+  const [modificationHistoryModalVisible, setModificationHistoryModalVisible] =
+    useState(false);
   const [searchSortKey, setSearchSortKey] = useState<string>("RELEVANCE");
   const [searchSortReverse, setSearchSortReverse] = useState<boolean>(false);
 
@@ -516,6 +520,16 @@ const HomePage: React.FC = () => {
     }
   };
 
+  const handleViewModificationHistory = () => {
+    if (productDetails) {
+      setModificationHistoryModalVisible(true);
+    } else {
+      message.warning(
+        "Seleziona prima un prodotto per visualizzare la cronologia modifiche"
+      );
+    }
+  };
+
   const handleReset = () => {
     setQuery("");
     setProductDetails(null);
@@ -806,6 +820,15 @@ const HomePage: React.FC = () => {
               >
                 Visualizza su Shop
               </Button>
+              <Button
+                type="default"
+                icon={<HistoryOutlined />}
+                onClick={handleViewModificationHistory}
+                size="large"
+                disabled={!productDetails}
+              >
+                Cronologia Modifiche
+              </Button>
             </Space>
           </Col>
         </Row>
@@ -857,6 +880,17 @@ const HomePage: React.FC = () => {
           </Button>
         </div>
       </Modal>
+
+      {/* Modification History Modal */}
+      {productDetails && (
+        <ModificationHistoryModal
+          visible={modificationHistoryModalVisible}
+          onClose={() => setModificationHistoryModalVisible(false)}
+          productId={productDetails.id}
+          productName={productDetails.nomeArticolo}
+          primaryLocation={primaryLocation}
+        />
+      )}
 
       {/* Settings Modal */}
       <Modal

@@ -1,40 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
+import type {
+  Product,
+  LocationConfig,
+  InventoryUpdate,
+  StatusResponse,
+  ProductModificationHistory,
+} from "../types/index";
 
-// Type definitions for API responses
-export interface Product {
-  id: string;
-  title: string;
-  handle: string;
-  price: string;
-  description: string;
-  images: string[];
-  variants: ProductVariant[];
-  total_inventory: number;
-  locations: { [key: string]: number };
-}
-
+// Local type definitions that don't conflict
 export interface ProductVariant {
   inventory_item_id: string;
   title: string;
   inventory_quantity: number;
   price: string;
   sku?: string;
-}
-
-export interface InventoryUpdate {
-  variant_id: string;
-  location_id: string;
-  adjustment: number;
-}
-
-export interface StatusResponse {
-  status: string;
-  message: string;
-}
-
-export interface LocationConfig {
-  primary_location: LocationInfo;
-  secondary_location: LocationInfo;
 }
 
 export interface LocationInfo {
@@ -55,7 +34,7 @@ export interface LogData {
 }
 
 export interface LogEntry {
-  request_type: string;
+  requestType: string;
   data: LogData;
   timestamp: string;
 }
@@ -438,6 +417,35 @@ export class InventoryAPI {
       throw new Error(`Failed to undo inventory decrease: ${error}`);
     }
   }
+
+  /**
+   * Get modification history for a specific product
+   */
+  static async getProductModificationHistory(
+    productId: string,
+    location: string,
+    daysBack: number
+  ): Promise<ProductModificationHistory> {
+    try {
+      const result = await invoke<ProductModificationHistory>(
+        "get_product_modification_history",
+        {
+          productId,
+          location,
+          daysBack,
+        }
+      );
+      console.log(
+        `🔍 Raw API Response - get_product_modification_history:`,
+        result
+      );
+      console.log(`📊 Analysis for product ${productId} over ${daysBack} days`);
+      return result;
+    } catch (error) {
+      console.error("Error getting product modification history:", error);
+      throw new Error(`Failed to get modification history: ${error}`);
+    }
+  }
 }
 
 // Firebase API functions
@@ -548,6 +556,34 @@ export class FirebaseAPI {
     } catch (error) {
       console.error("Error fetching logs with date range:", error);
       throw new Error(`Failed to fetch logs with date range: ${error}`);
+    }
+  }
+
+  /**
+   * Get logs for a specific product ID within a date range
+   */
+  static async getLogsByProductId(
+    productId: string,
+    location: string,
+    startDate: string,
+    endDate: string
+  ): Promise<LogEntry[]> {
+    try {
+      const result = await invoke<LogEntry[]>("get_logs_by_product_id", {
+        productId,
+        location,
+        startDate,
+        endDate,
+      });
+      console.log(
+        `🔍 Raw API Response - get_logs_by_product_id (product: ${productId}, location: ${location}):`,
+        result
+      );
+      console.log(`📊 Found ${result.length} logs for product ${productId}`);
+      return result;
+    } catch (error) {
+      console.error("Error fetching logs by product ID:", error);
+      throw new Error(`Failed to fetch product logs: ${error}`);
     }
   }
 }

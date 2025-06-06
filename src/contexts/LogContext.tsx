@@ -5,7 +5,7 @@ import React, {
   ReactNode,
   useCallback,
 } from "react";
-import { LogEntry } from "../types";
+import { LogEntry } from "../types/index";
 import { TauriAPI } from "../services/tauri";
 
 interface LogContextType {
@@ -69,7 +69,7 @@ export const LogProvider: React.FC<{ children: ReactNode }> = ({
 
         // Convert backend format to frontend format (handle both snake_case and camelCase)
         const formattedLogs: LogEntry[] = fetchedLogs.map((log) => ({
-          requestType: log.request_type || log.requestType, // Handle both formats
+          requestType: log.requestType, // Handle both formats
           timestamp: log.timestamp,
           data: log.data,
         }));

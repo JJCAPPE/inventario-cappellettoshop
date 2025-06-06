@@ -3,6 +3,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -51,6 +52,40 @@ struct ArrayValues {
 #[derive(Debug, Serialize, Deserialize)]
 struct MapValues {
     fields: HashMap<String, FirestoreValue>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProductModificationHistory {
+    pub product_id: String,
+    pub location: String,
+    pub date_range: DateRange,
+    pub variants: Vec<VariantModificationHistory>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VariantModificationHistory {
+    pub variant_title: String,
+    pub inventory_item_id: String,
+    pub app_modifications: i32,
+    pub shopify_modifications: i32,
+    pub discrepancy: bool,
+    pub current_quantity: i32,
+    pub modifications_details: Vec<ModificationDetail>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModificationDetail {
+    pub timestamp: String,
+    pub source: String, // "app" or "shopify"
+    pub change: i32,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DateRange {
+    pub start_date: String,
+    pub end_date: String,
+    pub days_back: i32,
 }
 
 // ============================================================================
@@ -656,6 +691,130 @@ impl FirebaseClient {
             timestamp,
         })
     }
+
+    /// Get logs for a specific product ID within a date range
+    pub async fn get_logs_by_product_id(
+        &self,
+        product_id: String,
+        location: String,
+        start_date: String,
+        end_date: String,
+    ) -> Result<Vec<LogEntry>, String> {
+        println!("🔍 Fetching Firebase logs for product ID: {}", product_id);
+        println!("   📅 Date range: {} to {}", start_date, end_date);
+        println!("   🏪 Location: {}", location);
+
+        // Create the upper bound with Unicode character for end date
+        let end_date_upper = format!("{}￿", end_date);
+
+        // Use the runQuery endpoint with proper timestamp filtering (same pattern as get_logs_date_range)
+        let url = format!("{}:runQuery", self.firestore_url);
+
+        println!("🌐 Firestore query URL: {}", url);
+
+        // Build the structured query to filter by product ID, location, and date range
+        let query_body = serde_json::json!({
+            "structuredQuery": {
+                "from": [{"collectionId": "logs"}],
+                "where": {
+                    "compositeFilter": {
+                        "op": "AND",
+                        "filters": [
+                            {
+                                "fieldFilter": {
+                                    "field": {"fieldPath": "data.id"},
+                                    "op": "EQUAL",
+                                    "value": {"stringValue": product_id}
+                                }
+                            },
+                            {
+                                "fieldFilter": {
+                                    "field": {"fieldPath": "data.negozio"},
+                                    "op": "EQUAL",
+                                    "value": {"stringValue": location}
+                                }
+                            },
+                            {
+                                "fieldFilter": {
+                                    "field": {"fieldPath": "timestamp"},
+                                    "op": "GREATER_THAN_OR_EQUAL",
+                                    "value": {"stringValue": start_date}
+                                }
+                            },
+                            {
+                                "fieldFilter": {
+                                    "field": {"fieldPath": "timestamp"},
+                                    "op": "LESS_THAN",
+                                    "value": {"stringValue": end_date_upper}
+                                }
+                            }
+                        ]
+                    }
+                },
+                "orderBy": [
+                    {
+                        "field": {"fieldPath": "timestamp"},
+                        "direction": "DESCENDING"
+                    }
+                ],
+                "limit": 100
+            }
+        });
+
+        println!(
+            "📋 Query body for product {}: {}",
+            product_id,
+            serde_json::to_string_pretty(&query_body)
+                .unwrap_or_else(|_| "Unable to serialize".to_string())
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .query(&[("key", &self.config.firebase_api_key)])
+            .json(&query_body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to get product logs from Firestore: {}", e))?;
+
+        println!("📡 Firebase response status: {}", response.status());
+
+        if response.status().is_success() {
+            let firestore_response: serde_json::Value = response
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse Firestore response: {}", e))?;
+
+            // Parse logs using existing method
+            let logs = self.parse_firestore_runquery_response(firestore_response, &None)?;
+
+            println!(
+                "✅ Found {} logs for product {} in location {} within date range",
+                logs.len(),
+                product_id,
+                location
+            );
+
+            Ok(logs)
+        } else {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            println!("❌ Firebase error response: {}", error_text);
+
+            // Check if this is an index-related error
+            if error_text.contains("index") || error_text.contains("FAILED_PRECONDITION") {
+                Err(format!(
+                    "Firebase index required for product modification history query. Please create a composite index in Firebase Console with fields: data.id (Ascending), data.negozio (Ascending), timestamp (Descending). Error: {}", 
+                    error_text
+                ))
+            } else {
+                Err(format!("Failed to get product logs: {}", error_text))
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -708,6 +867,20 @@ pub async fn get_firebase_config(
     config: tauri::State<'_, AppConfig>,
 ) -> Result<crate::utils::FirebaseConfig, String> {
     Ok(config.get_firebase_config())
+}
+
+#[tauri::command]
+pub async fn get_logs_by_product_id(
+    product_id: String,
+    location: String,
+    start_date: String,
+    end_date: String,
+    config: tauri::State<'_, AppConfig>,
+) -> Result<Vec<LogEntry>, String> {
+    let firebase_client = FirebaseClient::new(config.inner().clone());
+    firebase_client
+        .get_logs_by_product_id(product_id, location, start_date, end_date)
+        .await
 }
 
 // ============================================================================
