@@ -1,6 +1,6 @@
 use crate::firebase::{
-    create_inventory_log_data, DateRange, FirebaseClient, LogEntry, ModificationDetail,
-    ProductModificationHistory, VariantModificationHistory,
+    create_inventory_log_data, DailyModificationGroup, DateRange, FirebaseClient, LogEntry,
+    ModificationDetail, ProductModificationHistory, VariantModificationHistory,
 };
 use crate::location::LocationInfo;
 use crate::utils::{AppConfig, InventoryUpdate, StatusResponse};
@@ -507,11 +507,11 @@ pub async fn get_product_modification_history(
             variant_logs.len()
         );
 
-        // Calculate app modifications count
-        let app_modifications: i32 = variant_logs
-            .iter()
-            .map(|log| log.data.rettifica.abs())
-            .sum();
+        // Calculate total app net changes (sum of all rettifica values)
+        let app_net_change: i32 = variant_logs.iter().map(|log| log.data.rettifica).sum();
+
+        // Group modifications by date
+        let daily_groups = group_modifications_by_date(&variant_logs);
 
         // Get current inventory quantity
         let current_quantity = inventory_levels
@@ -521,41 +521,22 @@ pub async fn get_product_modification_history(
             .unwrap_or(0);
 
         println!("   📦 Current quantity: {}", current_quantity);
-        println!("   📱 App modifications: {}", app_modifications);
+        println!("   📱 App net change: {}", app_net_change);
 
-        // Calculate expected quantity if only app modifications occurred
-        let total_app_changes: i32 = variant_logs.iter().map(|log| log.data.rettifica).sum();
+        // For now, we'll estimate external modifications as 0
+        // In a real scenario, we'd need more complex logic to detect Shopify changes
+        let shopify_net_change = 0;
 
-        // For now, we'll estimate external modifications as a placeholder
-        // In a real scenario, we'd need to track quantity snapshots over time
-        let estimated_external_modifications = 0; // This would require more complex logic
-
-        let discrepancy = false; // This would be calculated based on quantity tracking
-
-        // Create modification details
-        let mut modifications_details = Vec::new();
-
-        // Add app modifications
-        for log in &variant_logs {
-            modifications_details.push(ModificationDetail {
-                timestamp: log.timestamp.clone(),
-                source: "app".to_string(),
-                change: log.data.rettifica,
-                reason: Some(log.request_type.clone()),
-            });
-        }
-
-        // Sort by timestamp (most recent first)
-        modifications_details.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        let discrepancy = app_net_change != shopify_net_change;
 
         let variant_history = VariantModificationHistory {
             variant_title: variant.title.clone(),
             inventory_item_id: variant.inventory_item_id.clone(),
-            app_modifications,
-            shopify_modifications: estimated_external_modifications,
+            app_net_change,
+            shopify_net_change,
             discrepancy,
             current_quantity,
-            modifications_details,
+            daily_modifications: daily_groups,
         };
 
         variants.push(variant_history);
@@ -570,4 +551,67 @@ pub async fn get_product_modification_history(
 
     println!("✅ Modification history analysis completed");
     Ok(history)
+}
+
+/// Group modifications by date and calculate net changes per day
+fn group_modifications_by_date(logs: &[&LogEntry]) -> Vec<DailyModificationGroup> {
+    use chrono::{DateTime, Utc};
+    use std::collections::HashMap;
+
+    let mut groups: HashMap<String, Vec<&LogEntry>> = HashMap::new();
+
+    // Group logs by date
+    for log in logs {
+        // Parse timestamp and extract date
+        let date = if let Ok(parsed_time) = DateTime::parse_from_rfc3339(&log.timestamp) {
+            parsed_time.format("%Y-%m-%d").to_string()
+        } else {
+            // Fallback: try to extract date from timestamp string
+            log.timestamp
+                .split('T')
+                .next()
+                .unwrap_or("unknown")
+                .to_string()
+        };
+
+        groups.entry(date).or_insert_with(Vec::new).push(log);
+    }
+
+    // Convert groups to DailyModificationGroup
+    let mut daily_groups: Vec<DailyModificationGroup> = groups
+        .into_iter()
+        .map(|(date, day_logs)| {
+            // Calculate net change for this date
+            let app_net_change: i32 = day_logs.iter().map(|log| log.data.rettifica).sum();
+
+            // Create modification details for this date
+            let app_details: Vec<ModificationDetail> = day_logs
+                .iter()
+                .map(|log| ModificationDetail {
+                    timestamp: log.timestamp.clone(),
+                    source: "app".to_string(),
+                    change: log.data.rettifica,
+                    reason: Some(log.request_type.clone()),
+                })
+                .collect();
+
+            // For now, no Shopify changes detected
+            let shopify_net_change = 0;
+            let shopify_details = Vec::new();
+
+            DailyModificationGroup {
+                date: date.clone(),
+                app_net_change,
+                shopify_net_change,
+                synchronized: app_net_change == shopify_net_change,
+                app_details,
+                shopify_details,
+            }
+        })
+        .collect();
+
+    // Sort by date (most recent first)
+    daily_groups.sort_by(|a, b| b.date.cmp(&a.date));
+
+    daily_groups
 }

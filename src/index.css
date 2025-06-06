@@ -16,8 +16,42 @@ code {
 
 .discrepancy-row {
     background-color: #fff2f0 !important;
+    border-left: 3px solid #ff4d4f;
 }
 
 .discrepancy-row:hover {
-    background-color: #ffe7e0 !important;
+    background-color: #ffebe6 !important;
+}
+
+
+/* Styling for expanded modification history rows */
+
+.ant-table-expanded-row>td {
+    padding: 0 !important;
+    background-color: #fafafa !important;
+    border-bottom: none !important;
+}
+
+.ant-table-expanded-row .ant-table-tbody>tr {
+    background-color: #fff !important;
+}
+
+.ant-table-expanded-row .ant-table-tbody>tr:hover {
+    background-color: #f5f5f5 !important;
+}
+
+
+/* Adjust expand icon styling */
+
+.ant-table-row-expand-icon {
+    color: #8c8c8c;
+    transition: color 0.3s;
+}
+
+.ant-table-row-expand-icon:hover {
+    color: #1890ff;
+}
+
+.ant-table-row-expand-icon.ant-table-row-expanded {
+    color: #1890ff;
 }

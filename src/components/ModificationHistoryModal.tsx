@@ -12,6 +12,7 @@ import {
   Badge,
   Timeline,
   message,
+  Button,
 } from "antd";
 import {
   HistoryOutlined,
@@ -20,6 +21,8 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   InfoCircleOutlined,
+  CaretDownOutlined,
+  CaretRightOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -28,12 +31,46 @@ import {
   VariantModificationHistory,
   ModificationDetail,
   TimeRangeOption,
+  DailyModificationGroup,
 } from "../types/index";
 import TauriAPI from "../services/tauri";
 
 dayjs.extend(relativeTime);
 
 const { Title, Text } = Typography;
+
+// Component for displaying net changes with proper formatting and colors
+const NetChangeTag: React.FC<{
+  value: number;
+  source?: "app" | "shopify" | "total";
+}> = ({ value, source = "total" }) => {
+  if (value === 0) {
+    return (
+      <Badge
+        count={0}
+        style={{
+          backgroundColor: "#d9d9d9",
+          color: "#666",
+        }}
+        showZero
+      />
+    );
+  }
+
+  const color =
+    source === "app" ? "#1890ff" : source === "shopify" ? "#52c41a" : "#722ed1";
+  const sign = value > 0 ? "+" : "";
+
+  return (
+    <Badge
+      count={`${sign}${value}`}
+      style={{
+        backgroundColor: color,
+        color: "#fff",
+      }}
+    />
+  );
+};
 
 interface ModificationHistoryModalProps {
   visible: boolean;
@@ -78,11 +115,8 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
       console.log("📊 Received modification history:", history);
       setData(history);
 
-      // Auto-expand rows with discrepancies
-      const discrepancyRows = history.variants
-        .filter((variant) => variant.discrepancy)
-        .map((variant) => variant.variant_title);
-      setExpandedRows(discrepancyRows);
+      // Don't auto-expand any rows - let user choose what to expand
+      setExpandedRows([]);
     } catch (error) {
       console.error("❌ Error fetching modification history:", error);
       message.error("Errore nel caricamento della cronologia modifiche");
@@ -119,8 +153,8 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
         </Tag>
       );
     } else if (
-      variant.app_modifications === 0 &&
-      variant.shopify_modifications === 0
+      variant.app_net_change === 0 &&
+      variant.shopify_net_change === 0
     ) {
       return (
         <Tag color="default" icon={<InfoCircleOutlined />}>
@@ -174,65 +208,46 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
       title: "Variante",
       dataIndex: "variant_title",
       key: "variant_title",
-      width: 200,
-      render: (text: string, record: VariantModificationHistory) => (
-        <Space direction="vertical" size={2}>
-          <Text strong>{text}</Text>
+      render: (title: string, record: VariantModificationHistory) => (
+        <div>
+          <Text strong>{title}</Text>
+          <br />
           <Text type="secondary" style={{ fontSize: 12 }}>
             Quantità: {record.current_quantity}
           </Text>
-        </Space>
+        </div>
       ),
     },
     {
       title: (
-        <Space>
-          <AppstoreOutlined style={{ color: "#1890ff" }} />
-          <span>Modifiche App</span>
-        </Space>
+        <span>
+          <AppstoreOutlined style={{ color: "#1890ff", marginRight: 4 }} />
+          Modifiche App
+        </span>
       ),
-      dataIndex: "app_modifications",
-      key: "app_modifications",
-      width: 150,
+      dataIndex: "app_net_change",
+      key: "app_net_change",
       align: "center" as const,
-      render: (count: number) => (
-        <Badge
-          count={count}
-          style={{
-            backgroundColor: count > 0 ? "#1890ff" : "#d9d9d9",
-            color: count > 0 ? "#fff" : "#666",
-          }}
-          showZero
-        />
-      ),
+      render: (value: number) => <NetChangeTag value={value} source="app" />,
     },
     {
       title: (
-        <Space>
-          <ShopOutlined style={{ color: "#52c41a" }} />
-          <span>Modifiche Shopify</span>
-        </Space>
+        <span>
+          <ShopOutlined style={{ color: "#52c41a", marginRight: 4 }} />
+          Modifiche Shopify
+        </span>
       ),
-      dataIndex: "shopify_modifications",
-      key: "shopify_modifications",
-      width: 150,
+      dataIndex: "shopify_net_change",
+      key: "shopify_net_change",
       align: "center" as const,
-      render: (count: number) => (
-        <Badge
-          count={count}
-          style={{
-            backgroundColor: count > 0 ? "#52c41a" : "#d9d9d9",
-            color: count > 0 ? "#fff" : "#666",
-          }}
-          showZero
-        />
+      render: (value: number) => (
+        <NetChangeTag value={value} source="shopify" />
       ),
     },
     {
       title: "Stato",
       dataIndex: "status",
       key: "status",
-      width: 150,
       align: "center" as const,
       render: (_: any, record: VariantModificationHistory) =>
         getStatusTag(record),
@@ -241,23 +256,83 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
 
   // Expanded row render function
   const expandedRowRender = (record: VariantModificationHistory) => {
-    if (record.modifications_details.length === 0) {
+    if (record.daily_modifications.length === 0) {
       return (
-        <Alert
-          message="Nessuna modifica registrata nel periodo selezionato"
-          type="info"
-          showIcon
-          style={{ margin: "16px 0" }}
-        />
+        <div
+          style={{
+            backgroundColor: "#fafafa",
+            padding: "16px",
+            borderRadius: "4px",
+          }}
+        >
+          <Alert
+            message="Nessuna modifica registrata nel periodo selezionato"
+            type="info"
+            showIcon
+            style={{ margin: 0 }}
+          />
+        </div>
       );
     }
 
+    // Return daily modifications as simple table rows
     return (
-      <div style={{ padding: "16px 0" }}>
-        <Title level={5}>
-          <HistoryOutlined /> Cronologia Modifiche - {record.variant_title}
-        </Title>
-        {formatModificationTimeline(record.modifications_details)}
+      <div style={{ backgroundColor: "#fafafa" }}>
+        {record.daily_modifications.map((dailyMod, index) => {
+          const [year, month, day] = dailyMod.date.split("-");
+          const formattedDate = `${day}/${month}/${year.slice(2)}`;
+
+          return (
+            <div
+              key={dailyMod.date}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "8px 16px",
+                backgroundColor: "#fafafa",
+                borderBottom:
+                  index < record.daily_modifications.length - 1
+                    ? "1px solid #f0f0f0"
+                    : "none",
+              }}
+            >
+              {/* Indent to show hierarchy */}
+              <div style={{ width: "20px" }}></div>
+
+              {/* Date column */}
+              <div style={{ flex: 1, fontWeight: "normal", fontSize: "14px" }}>
+                {formattedDate}
+              </div>
+
+              {/* App modifications column */}
+              <div style={{ flex: 1, textAlign: "center" }}>
+                <NetChangeTag value={dailyMod.app_net_change} source="app" />
+              </div>
+
+              {/* Shopify modifications column */}
+              <div style={{ flex: 1, textAlign: "center" }}>
+                <NetChangeTag
+                  value={dailyMod.shopify_net_change}
+                  source="shopify"
+                />
+              </div>
+
+              {/* Status column */}
+              <div style={{ flex: 1, textAlign: "center" }}>
+                <Text
+                  style={{
+                    color: dailyMod.synchronized ? "#52c41a" : "#f5222d",
+                    fontSize: 12,
+                  }}
+                >
+                  {dailyMod.synchronized
+                    ? "Sincronizzato"
+                    : "Non Sincronizzato"}
+                </Text>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -294,7 +369,7 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
             {productName}
           </Title>
           <Text type="secondary">
-            Posizione: {primaryLocation} • Prodotto ID: {productId}
+            Posizione: {primaryLocation} • ID Shopify Prodotto: {productId}
           </Text>
         </div>
 
@@ -343,23 +418,46 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
                 expandedRowKeys: expandedRows,
                 onExpandedRowsChange: (keys) =>
                   setExpandedRows(keys as string[]),
-                expandIcon: ({ expanded, onExpand, record }) => (
-                  <Tooltip
-                    title={
-                      expanded
-                        ? "Nascondi dettagli"
-                        : "Mostra cronologia dettagliata"
-                    }
-                  >
-                    <ClockCircleOutlined
-                      onClick={(e) => onExpand(record, e)}
-                      style={{
-                        cursor: "pointer",
-                        color: expanded ? "#1890ff" : "#8c8c8c",
-                      }}
-                    />
-                  </Tooltip>
-                ),
+                rowExpandable: (record) =>
+                  record.app_net_change !== 0 ||
+                  record.shopify_net_change !== 0,
+                expandIcon: ({ expanded, onExpand, record }) => {
+                  // Don't show expand icon if no modifications
+                  if (
+                    record.app_net_change === 0 &&
+                    record.shopify_net_change === 0
+                  ) {
+                    return null;
+                  }
+
+                  return (
+                    <Tooltip
+                      title={
+                        expanded
+                          ? "Nascondi cronologia giornaliera"
+                          : "Mostra cronologia giornaliera"
+                      }
+                    >
+                      {expanded ? (
+                        <CaretDownOutlined
+                          onClick={(e) => onExpand(record, e)}
+                          style={{
+                            cursor: "pointer",
+                            color: "#1890ff",
+                          }}
+                        />
+                      ) : (
+                        <CaretRightOutlined
+                          onClick={(e) => onExpand(record, e)}
+                          style={{
+                            cursor: "pointer",
+                            color: "#8c8c8c",
+                          }}
+                        />
+                      )}
+                    </Tooltip>
+                  );
+                },
               }}
               rowClassName={getRowClassName}
               size="middle"
