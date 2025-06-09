@@ -523,11 +523,49 @@ pub async fn get_product_modification_history(
         println!("   📦 Current quantity: {}", current_quantity);
         println!("   📱 App net change: {}", app_net_change);
 
-        // For now, we'll estimate external modifications as 0
-        // In a real scenario, we'd need more complex logic to detect Shopify changes
-        let shopify_net_change = 0;
+        // Enhanced Shopify change detection
+        // To detect Shopify changes, we need to infer what the starting quantity was
+        // and compare current quantity with expected quantity after our changes
+
+        // For this analysis, let's estimate the Shopify changes by looking at
+        // the discrepancy between what we expect and what we observe
+
+        // First, get the earliest log timestamp to understand the analysis window
+        let earliest_app_log = variant_logs.iter().min_by_key(|log| &log.timestamp);
+
+        // For a more accurate analysis, we would need:
+        // 1. Starting inventory at the beginning of the period
+        // 2. Or inventory snapshots over time
+        // 3. Or access to Shopify's inventory adjustment history
+
+        // For now, let's use a simplified approach:
+        // If we have app changes but inventory doesn't match expected pattern,
+        // there might be external changes
+
+        let shopify_net_change = if variant_logs.is_empty() {
+            // No app changes, so any inventory changes would be external
+            // But we don't have historical baseline, so assume 0 for now
+            0
+        } else {
+            // We have app changes, check if current state suggests external changes
+            // This is a simplified heuristic - in reality we'd need better baseline data
+            if app_net_change != 0 && current_quantity == 0 && app_net_change > 0 {
+                // We added inventory but current is 0 - suggests external removal
+                -app_net_change
+            } else if app_net_change == 0 && current_quantity != 0 {
+                // No app changes but inventory exists - suggests external addition
+                // But without baseline we can't calculate this accurately
+                0
+            } else {
+                // For now, assume no external changes
+                0
+            }
+        };
 
         let discrepancy = app_net_change != shopify_net_change;
+
+        println!("   🏪 Estimated Shopify net change: {}", shopify_net_change);
+        println!("   ⚠️ Discrepancy detected: {}", discrepancy);
 
         let variant_history = VariantModificationHistory {
             variant_title: variant.title.clone(),
@@ -595,7 +633,19 @@ fn group_modifications_by_date(logs: &[&LogEntry]) -> Vec<DailyModificationGroup
                 })
                 .collect();
 
-            // For now, no Shopify changes detected
+            // TODO: Improve Shopify change detection
+            // Currently we can't accurately detect Shopify changes without:
+            // 1. Historical inventory snapshots
+            // 2. Access to Shopify's inventory adjustment history API
+            // 3. Or implementing a baseline tracking system
+            //
+            // Future improvements:
+            // 1. Store inventory snapshots daily/periodically in Firebase
+            // 2. Use the new GraphQL adjustment API for our changes (marks them clearly)
+            // 3. Implement a webhook listener for inventory changes
+            // 4. Use Shopify's events API to track external changes
+            //
+            // For now, we'll show 0 Shopify changes per day
             let shopify_net_change = 0;
             let shopify_details = Vec::new();
 
@@ -614,4 +664,106 @@ fn group_modifications_by_date(logs: &[&LogEntry]) -> Vec<DailyModificationGroup
     daily_groups.sort_by(|a, b| b.date.cmp(&a.date));
 
     daily_groups
+}
+
+#[tauri::command]
+pub async fn adjust_inventory_graphql(
+    config: State<'_, AppConfig>,
+    inventory_item_id: String,
+    location_id: String,
+    delta: i32,
+    reason: String,
+) -> Result<StatusResponse, String> {
+    let client = reqwest::Client::new();
+    let url = config.get_api_url("graphql.json");
+
+    // Convert to Shopify Global IDs
+    let inventory_item_gid = format!("gid://shopify/InventoryItem/{}", inventory_item_id);
+    let location_gid = format!("gid://shopify/Location/{}", location_id);
+
+    let query = r#"
+        mutation inventoryAdjustQuantities($input: InventoryAdjustQuantitiesInput!) {
+            inventoryAdjustQuantities(input: $input) {
+                userErrors {
+                    field
+                    message
+                }
+                inventoryAdjustmentGroup {
+                    id
+                    createdAt
+                    reason
+                    changes {
+                        name
+                        delta
+                    }
+                }
+            }
+        }
+    "#;
+
+    let variables = json!({
+        "input": {
+            "reason": reason,
+            "name": "available",
+            "referenceDocumentUri": "app://inventario-cappelletto",
+            "changes": [{
+                "delta": delta,
+                "inventoryItemId": inventory_item_gid,
+                "locationId": location_gid
+            }]
+        }
+    });
+
+    let payload = json!({
+        "query": query,
+        "variables": variables
+    });
+
+    println!("🔄 Making GraphQL inventory adjustment:");
+    println!("   📦 Inventory Item: {}", inventory_item_id);
+    println!("   📍 Location: {}", location_id);
+    println!("   📊 Delta: {}", delta);
+    println!("   📝 Reason: {}", reason);
+
+    let response = client
+        .post(&url)
+        .headers(config.get_headers())
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("GraphQL request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "Failed to adjust inventory via GraphQL: {}",
+            error_text
+        ));
+    }
+
+    let response_json: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse GraphQL response: {}", e))?;
+
+    // Check for GraphQL errors
+    if let Some(errors) = response_json.get("errors") {
+        return Err(format!("GraphQL errors: {}", errors));
+    }
+
+    // Check for user errors
+    if let Some(user_errors) =
+        response_json["data"]["inventoryAdjustQuantities"]["userErrors"].as_array()
+    {
+        if !user_errors.is_empty() {
+            return Err(format!("Inventory adjustment errors: {:?}", user_errors));
+        }
+    }
+
+    println!("✅ GraphQL inventory adjustment completed successfully");
+
+    Ok(StatusResponse {
+        status: "success".to_string(),
+        message: format!("Inventory adjusted by {} via GraphQL", delta),
+    })
 }

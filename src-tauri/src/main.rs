@@ -38,6 +38,7 @@ fn main() {
             inventory::get_inventory_levels_for_locations,
             inventory::get_location_config,
             inventory::adjust_inventory,
+            inventory::adjust_inventory_graphql,
             inventory::set_inventory_level,
             inventory::get_low_stock_products,
             // Enhanced inventory commands with Firebase logging
