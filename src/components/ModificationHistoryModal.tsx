@@ -11,10 +11,14 @@ import {
   Tooltip,
   Badge,
   message,
+
+  Button,
+
 } from "antd";
 import {
   HistoryOutlined,
   AppstoreOutlined,
+
   ShopOutlined,
   ExclamationCircleOutlined,
   InfoCircleOutlined,
@@ -37,8 +41,7 @@ const { Title, Text } = Typography;
 // Component for displaying net changes with proper formatting and colors
 const NetChangeTag: React.FC<{
   value: number;
-  source?: "app" | "shopify" | "total";
-}> = ({ value, source = "total" }) => {
+}> = ({ value }) => {
   if (value === 0) {
     return (
       <Badge
@@ -52,8 +55,7 @@ const NetChangeTag: React.FC<{
     );
   }
 
-  const color =
-    source === "app" ? "#1890ff" : source === "shopify" ? "#52c41a" : "#722ed1";
+  const color = "#1890ff"; // Always use app color
   const sign = value > 0 ? "+" : "";
 
   return (
@@ -139,32 +141,6 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
     onClose();
   };
 
-  // Get status tag based on modification data
-  const getStatusTag = (variant: VariantModificationHistory) => {
-    if (variant.discrepancy) {
-      return (
-        <Tag color="error" icon={<ExclamationCircleOutlined />}>
-          Discrepanza
-        </Tag>
-      );
-    } else if (
-      variant.app_net_change === 0 &&
-      variant.shopify_net_change === 0
-    ) {
-      return (
-        <Tag color="default" icon={<InfoCircleOutlined />}>
-          Nessuna Modifica
-        </Tag>
-      );
-    } else {
-      return (
-        <Tag color="success" icon={<InfoCircleOutlined />}>
-          Sincronizzato
-        </Tag>
-      );
-    }
-  };
-
   // Table columns configuration
   const columns = [
     {
@@ -191,121 +167,165 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
       dataIndex: "app_net_change",
       key: "app_net_change",
       align: "center" as const,
-      render: (value: number) => <NetChangeTag value={value} source="app" />,
-    },
-    {
-      title: (
-        <span>
-          <ShopOutlined style={{ color: "#52c41a", marginRight: 4 }} />
-          Modifiche Shopify
-        </span>
-      ),
-      dataIndex: "shopify_net_change",
-      key: "shopify_net_change",
-      align: "center" as const,
-      render: (value: number) => (
-        <NetChangeTag value={value} source="shopify" />
-      ),
-    },
-    {
-      title: "Stato",
-      dataIndex: "status",
-      key: "status",
-      align: "center" as const,
-      render: (_: any, record: VariantModificationHistory) =>
-        getStatusTag(record),
+      render: (value: number) => <NetChangeTag value={value} />,
     },
   ];
 
-  // Expanded row render function
+  // Render the timeline for daily modifications
   const expandedRowRender = (record: VariantModificationHistory) => {
     if (record.daily_modifications.length === 0) {
       return (
-        <div
-          style={{
-            backgroundColor: "#fafafa",
-            padding: "16px",
-            borderRadius: "4px",
-          }}
-        >
-          <Alert
-            message="Nessuna modifica registrata nel periodo selezionato"
-            type="info"
-            showIcon
-            style={{ margin: 0 }}
-          />
-        </div>
+        <Alert
+          message="Nessuna modifica registrata dall'app in questo periodo."
+          type="info"
+          showIcon
+          icon={<InfoCircleOutlined />}
+          style={{ margin: "16px" }}
+        />
       );
     }
 
-    // Return daily modifications as simple table rows
     return (
-      <div style={{ backgroundColor: "#fafafa" }}>
-        {record.daily_modifications.map((dailyMod, index) => {
-          const [year, month, day] = dailyMod.date.split("-");
-          const formattedDate = `${day}/${month}/${year.slice(2)}`;
-
-          return (
+      <div style={{ padding: "20px", backgroundColor: "#f9f9f9" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {record.daily_modifications.map((group, index) => (
             <div
-              key={dailyMod.date}
+              key={group.date}
               style={{
                 display: "flex",
-                alignItems: "center",
-                padding: "8px 16px",
-                backgroundColor: "#fafafa",
-                borderBottom:
-                  index < record.daily_modifications.length - 1
-                    ? "1px solid #f0f0f0"
-                    : "none",
+                width: "100%",
+                gap: "20px",
+                alignItems: "flex-start",
               }}
             >
-              {/* Indent to show hierarchy */}
-              <div style={{ width: "20px" }}></div>
-
-              {/* Date column */}
-              <div style={{ flex: 1, fontWeight: "normal", fontSize: "14px" }}>
-                {formattedDate}
-              </div>
-
-              {/* App modifications column */}
-              <div style={{ flex: 1, textAlign: "center" }}>
-                <NetChangeTag value={dailyMod.app_net_change} source="app" />
-              </div>
-
-              {/* Shopify modifications column */}
-              <div style={{ flex: 1, textAlign: "center" }}>
-                <NetChangeTag
-                  value={dailyMod.shopify_net_change}
-                  source="shopify"
-                />
-              </div>
-
-              {/* Status column */}
-              <div style={{ flex: 1, textAlign: "center" }}>
+              {/* Date section */}
+              <div
+                style={{
+                  minWidth: "140px",
+                  textAlign: "left",
+                  paddingTop: "8px",
+                }}
+              >
+                <Text strong style={{ fontSize: "16px", display: "block" }}>
+                  {dayjs(group.date).format("DD/MM/YYYY")}
+                </Text>
                 <Text
-                  style={{
-                    color: dailyMod.synchronized ? "#52c41a" : "#f5222d",
-                    fontSize: 12,
-                  }}
+                  type="secondary"
+                  style={{ fontSize: "12px", display: "block" }}
                 >
-                  {dailyMod.synchronized
-                    ? "Sincronizzato"
-                    : "Non Sincronizzato"}
+                  {dayjs(group.date).format("dddd")}
                 </Text>
               </div>
+
+              {/* Timeline connector */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  paddingTop: "8px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "12px",
+                    height: "12px",
+                    borderRadius: "50%",
+                    backgroundColor: "#1890ff",
+                    border: "2px solid #fff",
+                    boxShadow: "0 0 0 2px #1890ff",
+                  }}
+                />
+                {index < record.daily_modifications.length - 1 && (
+                  <div
+                    style={{
+                      width: "2px",
+                      height: "80px",
+                      backgroundColor: "#e6f4ff",
+                      marginTop: "4px",
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Content section */}
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    padding: "16px",
+                    border: "1px solid #e6f4ff",
+                    borderRadius: "8px",
+                    backgroundColor: "#fff",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <Space
+                    align="center"
+                    style={{
+                      width: "100%",
+                      marginBottom: "16px",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Title level={5} style={{ margin: 0, color: "#1890ff" }}>
+                      <AppstoreOutlined style={{ marginRight: "8px" }} />
+                      Modifiche App
+                    </Title>
+                    <NetChangeTag value={group.app_net_change} />
+                  </Space>
+
+                  {group.app_details.length > 0 ? (
+                    <div style={{ marginLeft: "0" }}>
+                      {group.app_details.map((detail, detailIndex) => (
+                        <div
+                          key={detailIndex}
+                          style={{
+                            padding: "12px 0",
+                            borderBottom:
+                              detailIndex < group.app_details.length - 1
+                                ? "1px solid #f0f0f0"
+                                : "none",
+                          }}
+                        >
+                          <Space
+                            direction="vertical"
+                            size={4}
+                            style={{ width: "100%" }}
+                          >
+                            <Space>
+                              <Text strong style={{ fontSize: "14px" }}>
+                                {detail.change > 0
+                                  ? `+${detail.change}`
+                                  : detail.change}
+                              </Text>
+                              <Tag color="blue">App</Tag>
+                              {detail.reason && (
+                                <Tag color="default">{detail.reason}</Tag>
+                              )}
+                            </Space>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {dayjs(detail.timestamp).format(
+                                "DD/MM/YYYY HH:mm"
+                              )}{" "}
+                              ({dayjs(detail.timestamp).fromNow()})
+                            </Text>
+                          </Space>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <Text type="secondary" style={{ fontStyle: "italic" }}>
+                      Nessuna modifica registrata per questo giorno.
+                    </Text>
+                  )}
+                </div>
+              </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+
       </div>
     );
-  };
-
-  // Get row className for styling
-  const getRowClassName = (record: VariantModificationHistory) => {
-    if (record.discrepancy) {
-      return "discrepancy-row";
-    }
-    return "";
   };
 
   const selectedTimeRangeOption = TIME_RANGE_OPTIONS.find(
@@ -359,83 +379,54 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
           </Space>
         </div>
 
-        {data && data.variants.some((v) => v.discrepancy) && (
-          <Alert
-            message="Discrepanze Rilevate"
-            description="Alcune varianti mostrano differenze tra le modifiche dell'app e quelle di Shopify. Controlla i dettagli espandendo le righe evidenziate."
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-        )}
-
-        <Spin spinning={loading}>
-          {data && (
+        <Spin spinning={loading} size="large">
+          {data ? (
             <Table
-              columns={columns}
               dataSource={data.variants}
-              rowKey="variant_title"
+              columns={columns}
+              rowKey="inventory_item_id"
               pagination={false}
               expandable={{
                 expandedRowRender,
-                expandedRowKeys: expandedRows,
-                onExpandedRowsChange: (keys) =>
-                  setExpandedRows(keys as string[]),
                 rowExpandable: (record) =>
-                  record.app_net_change !== 0 ||
-                  record.shopify_net_change !== 0,
-                expandIcon: ({ expanded, onExpand, record }) => {
-                  // Don't show expand icon if no modifications
-                  if (
-                    record.app_net_change === 0 &&
-                    record.shopify_net_change === 0
-                  ) {
-                    return null;
-                  }
-
-                  return (
-                    <Tooltip
-                      title={
-                        expanded
-                          ? "Nascondi cronologia giornaliera"
-                          : "Mostra cronologia giornaliera"
-                      }
-                    >
-                      {expanded ? (
-                        <CaretDownOutlined
-                          onClick={(e) => onExpand(record, e)}
-                          style={{
-                            cursor: "pointer",
-                            color: "#1890ff",
-                          }}
-                        />
-                      ) : (
-                        <CaretRightOutlined
-                          onClick={(e) => onExpand(record, e)}
-                          style={{
-                            cursor: "pointer",
-                            color: "#8c8c8c",
-                          }}
-                        />
-                      )}
-                    </Tooltip>
-                  );
+                  record.daily_modifications.length > 0,
+                expandedRowKeys: expandedRows,
+                onExpand: (expanded, record) => {
+                  const keys = expanded
+                    ? [...expandedRows, record.inventory_item_id]
+                    : expandedRows.filter(
+                        (key) => key !== record.inventory_item_id
+                      );
+                  setExpandedRows(keys);
                 },
+                expandIcon: ({ expanded, onExpand, record }) =>
+                  record.daily_modifications.length > 0 ? (
+                    <Button
+                      type="text"
+                      shape="circle"
+                      onClick={(e) => onExpand(record, e)}
+                      icon={
+                        expanded ? (
+                          <CaretDownOutlined />
+                        ) : (
+                          <CaretRightOutlined />
+                        )
+                      }
+                    />
+                  ) : null,
               }}
-              rowClassName={getRowClassName}
-              size="middle"
             />
+          ) : (
+            !loading && (
+              <Alert
+                message="Nessun dato disponibile"
+                description="Non sono state trovate varianti per questo prodotto nel periodo selezionato."
+                type="info"
+                showIcon
+              />
+            )
           )}
         </Spin>
-
-        {data && data.variants.length === 0 && !loading && (
-          <Alert
-            message="Nessun dato disponibile"
-            description="Non sono state trovate varianti per questo prodotto nel periodo selezionato."
-            type="info"
-            showIcon
-          />
-        )}
       </Modal>
     </>
   );

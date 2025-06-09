@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Layout, Button, Drawer, ConfigProvider } from "antd";
-import { HistoryOutlined, CloseOutlined } from "@ant-design/icons";
+
+import { DatabaseOutlined, HistoryOutlined, CloseOutlined } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
 import StatisticsPage from "./components/StatisticsPage";
@@ -73,12 +74,18 @@ function App() {
   const [targetProductId, setTargetProductId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
+
+  useEffect(() => {
+    document.title = "Inventario Cappelletto Shop";
+  }, []);
+
   // Function to handle navigation to a specific product
   const handleNavigateToProduct = (productId: string) => {
     console.log("🚀 App: Navigating to product:", productId);
     setTargetProductId(productId);
     setSidebarVisible(false); // Close the sidebar when navigating
   };
+
 
   // Simplified toggle function
   const handleDataPanelToggle = (e: React.MouseEvent) => {
@@ -199,7 +206,7 @@ function App() {
                     ? "modifiche-button-active"
                     : ""
                 }
-                icon={<HistoryOutlined />}
+                icon={<DatabaseOutlined />}
                 onClick={handleDataPanelToggle}
                 style={{
                   background:

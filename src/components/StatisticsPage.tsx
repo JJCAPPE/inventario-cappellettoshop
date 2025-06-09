@@ -22,7 +22,7 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import { TauriAPI } from "../services/tauri";
-import { LogEntry } from "../types";
+import { LogEntry } from "../types/index";
 import dayjs, { Dayjs } from "dayjs";
 
 const { Title, Text } = Typography;
@@ -90,7 +90,7 @@ const StatisticsPage: React.FC = () => {
 
       // Convert backend format to frontend format
       const formattedLogs: LogEntry[] = fetchedLogs.map((log) => ({
-        requestType: log.request_type || log.requestType,
+        requestType: log.requestType,
         timestamp: log.timestamp,
         data: log.data,
       }));
