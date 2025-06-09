@@ -122,8 +122,6 @@ export interface VariantModificationHistory {
   variant_title: string;
   inventory_item_id: string;
   app_net_change: number; // Total net change from app in period
-  shopify_net_change: number; // Total net change from Shopify in period
-  discrepancy: boolean;
   current_quantity: number;
   daily_modifications: DailyModificationGroup[]; // Daily breakdown
 }
@@ -131,10 +129,7 @@ export interface VariantModificationHistory {
 export interface DailyModificationGroup {
   date: string; // YYYY-MM-DD format for grouping
   app_net_change: number; // Net change from app for this date
-  shopify_net_change: number; // Net change from Shopify for this date
-  synchronized: boolean; // Whether app and Shopify agree for this date
   app_details: ModificationDetail[]; // Individual app modifications
-  shopify_details: ModificationDetail[]; // Individual Shopify modifications
 }
 
 export interface ModificationDetail {

@@ -66,21 +66,16 @@ pub struct ProductModificationHistory {
 pub struct VariantModificationHistory {
     pub variant_title: String,
     pub inventory_item_id: String,
-    pub app_net_change: i32,     // Total net change from app in period
-    pub shopify_net_change: i32, // Total net change from Shopify in period
-    pub discrepancy: bool,
+    pub app_net_change: i32, // Total net change from app in period
     pub current_quantity: i32,
     pub daily_modifications: Vec<DailyModificationGroup>, // Daily breakdown
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DailyModificationGroup {
-    pub date: String,                             // YYYY-MM-DD format for grouping
-    pub app_net_change: i32,                      // Net change from app for this date
-    pub shopify_net_change: i32,                  // Net change from Shopify for this date
-    pub synchronized: bool,                       // Whether app and Shopify agree for this date
-    pub app_details: Vec<ModificationDetail>,     // Individual app modifications
-    pub shopify_details: Vec<ModificationDetail>, // Individual Shopify modifications
+    pub date: String,                         // YYYY-MM-DD format for grouping
+    pub app_net_change: i32,                  // Net change from app for this date
+    pub app_details: Vec<ModificationDetail>, // Individual app modifications
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

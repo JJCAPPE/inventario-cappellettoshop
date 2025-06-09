@@ -523,56 +523,12 @@ pub async fn get_product_modification_history(
         println!("   📦 Current quantity: {}", current_quantity);
         println!("   📱 App net change: {}", app_net_change);
 
-        // Enhanced Shopify change detection
-        // To detect Shopify changes, we need to infer what the starting quantity was
-        // and compare current quantity with expected quantity after our changes
-
-        // For this analysis, let's estimate the Shopify changes by looking at
-        // the discrepancy between what we expect and what we observe
-
-        // First, get the earliest log timestamp to understand the analysis window
-        let earliest_app_log = variant_logs.iter().min_by_key(|log| &log.timestamp);
-
-        // For a more accurate analysis, we would need:
-        // 1. Starting inventory at the beginning of the period
-        // 2. Or inventory snapshots over time
-        // 3. Or access to Shopify's inventory adjustment history
-
-        // For now, let's use a simplified approach:
-        // If we have app changes but inventory doesn't match expected pattern,
-        // there might be external changes
-
-        let shopify_net_change = if variant_logs.is_empty() {
-            // No app changes, so any inventory changes would be external
-            // But we don't have historical baseline, so assume 0 for now
-            0
-        } else {
-            // We have app changes, check if current state suggests external changes
-            // This is a simplified heuristic - in reality we'd need better baseline data
-            if app_net_change != 0 && current_quantity == 0 && app_net_change > 0 {
-                // We added inventory but current is 0 - suggests external removal
-                -app_net_change
-            } else if app_net_change == 0 && current_quantity != 0 {
-                // No app changes but inventory exists - suggests external addition
-                // But without baseline we can't calculate this accurately
-                0
-            } else {
-                // For now, assume no external changes
-                0
-            }
-        };
-
-        let discrepancy = app_net_change != shopify_net_change;
-
-        println!("   🏪 Estimated Shopify net change: {}", shopify_net_change);
-        println!("   ⚠️ Discrepancy detected: {}", discrepancy);
+        // All logic for Shopify change detection and discrepancy has been removed.
 
         let variant_history = VariantModificationHistory {
             variant_title: variant.title.clone(),
             inventory_item_id: variant.inventory_item_id.clone(),
             app_net_change,
-            shopify_net_change,
-            discrepancy,
             current_quantity,
             daily_modifications: daily_groups,
         };
@@ -633,29 +589,12 @@ fn group_modifications_by_date(logs: &[&LogEntry]) -> Vec<DailyModificationGroup
                 })
                 .collect();
 
-            // TODO: Improve Shopify change detection
-            // Currently we can't accurately detect Shopify changes without:
-            // 1. Historical inventory snapshots
-            // 2. Access to Shopify's inventory adjustment history API
-            // 3. Or implementing a baseline tracking system
-            //
-            // Future improvements:
-            // 1. Store inventory snapshots daily/periodically in Firebase
-            // 2. Use the new GraphQL adjustment API for our changes (marks them clearly)
-            // 3. Implement a webhook listener for inventory changes
-            // 4. Use Shopify's events API to track external changes
-            //
-            // For now, we'll show 0 Shopify changes per day
-            let shopify_net_change = 0;
-            let shopify_details = Vec::new();
+            // Shopify-related logic has been removed.
 
             DailyModificationGroup {
                 date: date.clone(),
                 app_net_change,
-                shopify_net_change,
-                synchronized: app_net_change == shopify_net_change,
                 app_details,
-                shopify_details,
             }
         })
         .collect();
