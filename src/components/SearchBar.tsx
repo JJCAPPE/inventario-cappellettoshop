@@ -47,24 +47,31 @@ const SearchBar: React.FC<SearchBarProps> = ({
         "products"
       );
 
-      // If we got exactly 1 product and the search query looks like an SKU,
-      // check if it's an exact SKU match for auto-selection
-      if (products.length === 1 && searchQuery.trim().length > 5) {
+      // Auto-select logic: select immediately if only one result is found
+      if (products.length === 1 && onAutoSelect) {
         const product = products[0];
+
+        // Check if it's an exact SKU match first
         const matchingVariant = product.variants.find(
           (v) =>
             v.sku && v.sku.toLowerCase() === searchQuery.trim().toLowerCase()
         );
 
-        if (matchingVariant && onAutoSelect) {
+        if (matchingVariant) {
           console.log(
             "✅ SearchBar: Exact SKU match found, auto-selecting:",
             product.title
           );
-          onAutoSelect(product.id, searchQuery);
-          setOptions([]);
-          return;
+        } else {
+          console.log(
+            "✅ SearchBar: Only one search result found, auto-selecting:",
+            product.title
+          );
         }
+
+        onAutoSelect(product.id, searchQuery);
+        setOptions([]);
+        return;
       }
 
       // Process all products for display
