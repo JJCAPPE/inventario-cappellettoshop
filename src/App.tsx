@@ -1,10 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Layout, Button, Drawer, ConfigProvider } from "antd";
-import {
-  HistoryOutlined,
-  BarChartOutlined,
-  CloseOutlined,
-} from "@ant-design/icons";
+import { HistoryOutlined, CloseOutlined } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
 import StatisticsPage from "./components/StatisticsPage";
@@ -74,21 +70,14 @@ const customTheme = {
 function App() {
   const [currentView, setCurrentView] = useState<SidebarView>("data");
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [targetProductId, setTargetProductId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  const handleSidebarToggle = (view: SidebarView) => {
-    console.log("🔄 Toggle clicked:", { view, currentView, sidebarVisible });
-
-    if (sidebarVisible && currentView === view) {
-      // Currently open with the same view - close it
-      console.log("📱 Closing sidebar");
-      setSidebarVisible(false);
-    } else {
-      // Either closed or different view - open with new view
-      console.log("📱 Opening sidebar with view:", view);
-      setCurrentView(view);
-      setSidebarVisible(true);
-    }
+  // Function to handle navigation to a specific product
+  const handleNavigateToProduct = (productId: string) => {
+    console.log("🚀 App: Navigating to product:", productId);
+    setTargetProductId(productId);
+    setSidebarVisible(false); // Close the sidebar when navigating
   };
 
   // Simplified toggle function
@@ -162,11 +151,11 @@ function App() {
   const renderSidebarContent = () => {
     switch (currentView) {
       case "data":
-        return <DataPage />;
+        return <DataPage onNavigateToProduct={handleNavigateToProduct} />;
       case "statistics":
         return <StatisticsPage />;
       default:
-        return <DataPage />;
+        return <DataPage onNavigateToProduct={handleNavigateToProduct} />;
     }
   };
 
@@ -237,39 +226,15 @@ function App() {
                   ? "Chiudi Modifiche"
                   : "Modifiche"}
               </Button>
-              {/* Statistics button temporarily hidden 
-              <Button
-                type={
-                  sidebarVisible && currentView === "statistics"
-                    ? "primary"
-                    : "default"
-                }
-                icon={<BarChartOutlined />}
-                onClick={() => handleSidebarToggle("statistics")}
-                style={{
-                  background:
-                    sidebarVisible && currentView === "statistics"
-                      ? "#492513"
-                      : "transparent",
-                  borderColor:
-                    sidebarVisible && currentView === "statistics"
-                      ? "#492513"
-                      : "#d9d9d9",
-                  color:
-                    sidebarVisible && currentView === "statistics"
-                      ? "white"
-                      : "#d9d9d9",
-                }}
-              >
-                Statistiche
-              </Button>
-              */}
             </div>
           </Header>
 
           <Layout style={{ marginTop: 64 }}>
             <Content style={{ position: "relative" }}>
-              <HomePage />
+              <HomePage
+                targetProductId={targetProductId}
+                onTargetProductProcessed={() => setTargetProductId(null)}
+              />
             </Content>
 
             {/* Sidebar Drawer for mobile/tablet */}

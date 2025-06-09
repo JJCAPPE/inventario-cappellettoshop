@@ -37,7 +37,15 @@ const { Panel } = Collapse;
 
 const version = import.meta.env.VITE_VERSION || "3.0.0";
 
-const HomePage: React.FC = () => {
+interface HomePageProps {
+  targetProductId?: string | null;
+  onTargetProductProcessed?: () => void;
+}
+
+const HomePage: React.FC<HomePageProps> = ({
+  targetProductId,
+  onTargetProductProcessed,
+}) => {
   const { fetchLogs } = useLogs();
   const [query, setQuery] = useState("");
   const [productDetails, setProductDetails] = useState<ProductDetails | null>(
@@ -119,6 +127,27 @@ const HomePage: React.FC = () => {
       }
     }
   }, [productDetails, selectedVariant]);
+
+  // Handle external navigation to a specific product
+  useEffect(() => {
+    if (targetProductId && onTargetProductProcessed) {
+      console.log(
+        "🎯 HomePage: External navigation to product:",
+        targetProductId
+      );
+      // Trigger the product selection using the existing handleSearchSelect function
+      // Use an empty search query since we're navigating directly by ID
+      handleSearchSelect(targetProductId, `Product ID: ${targetProductId}`)
+        .then(() => {
+          console.log("✅ HomePage: Navigation to product completed");
+          onTargetProductProcessed(); // Clear the target product ID
+        })
+        .catch((error) => {
+          console.error("❌ HomePage: Error navigating to product:", error);
+          onTargetProductProcessed(); // Clear the target product ID even on error
+        });
+    }
+  }, [targetProductId, onTargetProductProcessed]);
 
   const handleLocationChange = (newPrimaryLocation: string) => {
     setPrimaryLocation(newPrimaryLocation);
