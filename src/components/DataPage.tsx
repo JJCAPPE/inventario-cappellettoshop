@@ -28,7 +28,11 @@ dayjs.locale("it");
 const { Text } = Typography;
 const { Search } = Input;
 
-const DataPage: React.FC = () => {
+interface DataPageProps {
+  onNavigateToProduct?: (productId: string) => void;
+}
+
+const DataPage: React.FC<DataPageProps> = ({ onNavigateToProduct }) => {
   const { logs, loading, error, fetchLogs, refreshLogs } = useLogs();
 
   useEffect(() => {
@@ -65,6 +69,14 @@ const DataPage: React.FC = () => {
 
   const getRequestTypeIcon = () => {
     return <ShoppingOutlined />;
+  };
+
+  // Handle clicking on a product card to navigate to it in homepage
+  const handleProductClick = (productId: string) => {
+    if (onNavigateToProduct) {
+      console.log("🔄 DataPage: Navigating to product:", productId);
+      onNavigateToProduct(productId);
+    }
   };
 
   // Get current location for display
@@ -162,6 +174,7 @@ const DataPage: React.FC = () => {
           dataSource={logs}
           renderItem={(log) => (
             <List.Item
+              onClick={() => handleProductClick(log.data.id)}
               style={{
                 backgroundColor:
                   log.requestType === "Annullamento"
@@ -173,6 +186,19 @@ const DataPage: React.FC = () => {
                 borderRadius: 8,
                 marginBottom: 8,
                 padding: 12,
+                cursor: onNavigateToProduct ? "pointer" : "default",
+                transition: "box-shadow 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (onNavigateToProduct) {
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 12px rgba(0,0,0,0.15)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (onNavigateToProduct) {
+                  e.currentTarget.style.boxShadow = "none";
+                }
               }}
             >
               <List.Item.Meta

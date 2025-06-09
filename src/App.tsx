@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Layout, Button, Drawer, ConfigProvider } from "antd";
-import { DatabaseOutlined, CloseOutlined } from "@ant-design/icons";
+
+import { DatabaseOutlined, HistoryOutlined, CloseOutlined } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
 import StatisticsPage from "./components/StatisticsPage";
@@ -70,11 +71,21 @@ const customTheme = {
 function App() {
   const [currentView, setCurrentView] = useState<SidebarView>("data");
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [targetProductId, setTargetProductId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     document.title = "Inventario Cappelletto Shop";
   }, []);
+
+  // Function to handle navigation to a specific product
+  const handleNavigateToProduct = (productId: string) => {
+    console.log("🚀 App: Navigating to product:", productId);
+    setTargetProductId(productId);
+    setSidebarVisible(false); // Close the sidebar when navigating
+  };
+
 
   // Simplified toggle function
   const handleDataPanelToggle = (e: React.MouseEvent) => {
@@ -147,11 +158,11 @@ function App() {
   const renderSidebarContent = () => {
     switch (currentView) {
       case "data":
-        return <DataPage />;
+        return <DataPage onNavigateToProduct={handleNavigateToProduct} />;
       case "statistics":
         return <StatisticsPage />;
       default:
-        return <DataPage />;
+        return <DataPage onNavigateToProduct={handleNavigateToProduct} />;
     }
   };
 
@@ -227,7 +238,10 @@ function App() {
 
           <Layout style={{ marginTop: 64 }}>
             <Content style={{ position: "relative" }}>
-              <HomePage />
+              <HomePage
+                targetProductId={targetProductId}
+                onTargetProductProcessed={() => setTargetProductId(null)}
+              />
             </Content>
 
             {/* Sidebar Drawer for mobile/tablet */}
