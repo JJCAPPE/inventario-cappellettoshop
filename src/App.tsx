@@ -1,10 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Layout, Button, Drawer, ConfigProvider } from "antd";
-import {
-  HistoryOutlined,
-  BarChartOutlined,
-  CloseOutlined,
-} from "@ant-design/icons";
+import { DatabaseOutlined, CloseOutlined } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
 import StatisticsPage from "./components/StatisticsPage";
@@ -76,20 +72,9 @@ function App() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  const handleSidebarToggle = (view: SidebarView) => {
-    console.log("🔄 Toggle clicked:", { view, currentView, sidebarVisible });
-
-    if (sidebarVisible && currentView === view) {
-      // Currently open with the same view - close it
-      console.log("📱 Closing sidebar");
-      setSidebarVisible(false);
-    } else {
-      // Either closed or different view - open with new view
-      console.log("📱 Opening sidebar with view:", view);
-      setCurrentView(view);
-      setSidebarVisible(true);
-    }
-  };
+  useEffect(() => {
+    document.title = "Inventario Cappelletto Shop";
+  }, []);
 
   // Simplified toggle function
   const handleDataPanelToggle = (e: React.MouseEvent) => {
@@ -210,7 +195,7 @@ function App() {
                     ? "modifiche-button-active"
                     : ""
                 }
-                icon={<HistoryOutlined />}
+                icon={<DatabaseOutlined />}
                 onClick={handleDataPanelToggle}
                 style={{
                   background:
@@ -237,33 +222,6 @@ function App() {
                   ? "Chiudi Modifiche"
                   : "Modifiche"}
               </Button>
-              {/* Statistics button temporarily hidden 
-              <Button
-                type={
-                  sidebarVisible && currentView === "statistics"
-                    ? "primary"
-                    : "default"
-                }
-                icon={<BarChartOutlined />}
-                onClick={() => handleSidebarToggle("statistics")}
-                style={{
-                  background:
-                    sidebarVisible && currentView === "statistics"
-                      ? "#492513"
-                      : "transparent",
-                  borderColor:
-                    sidebarVisible && currentView === "statistics"
-                      ? "#492513"
-                      : "#d9d9d9",
-                  color:
-                    sidebarVisible && currentView === "statistics"
-                      ? "white"
-                      : "#d9d9d9",
-                }}
-              >
-                Statistiche
-              </Button>
-              */}
             </div>
           </Header>
 

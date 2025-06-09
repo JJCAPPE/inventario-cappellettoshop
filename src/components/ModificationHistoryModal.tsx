@@ -10,16 +10,12 @@ import {
   Spin,
   Tooltip,
   Badge,
-  Timeline,
   message,
   Button,
 } from "antd";
 import {
   HistoryOutlined,
   AppstoreOutlined,
-  ShopOutlined,
-  ClockCircleOutlined,
-  ExclamationCircleOutlined,
   InfoCircleOutlined,
   CaretDownOutlined,
   CaretRightOutlined,
@@ -29,9 +25,7 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import {
   ProductModificationHistory,
   VariantModificationHistory,
-  ModificationDetail,
   TimeRangeOption,
-  DailyModificationGroup,
 } from "../types/index";
 import TauriAPI from "../services/tauri";
 
@@ -142,35 +136,6 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
     onClose();
   };
 
-  // Format modification details timeline
-  const formatModificationTimeline = (details: ModificationDetail[]) => {
-    return (
-      <Timeline
-        items={details.map((detail) => ({
-          color: "#1890ff",
-          dot: <AppstoreOutlined />,
-          children: (
-            <div>
-              <Space direction="vertical" size={2}>
-                <Space>
-                  <Text strong>
-                    {detail.change > 0 ? `+${detail.change}` : detail.change}
-                  </Text>
-                  <Tag color="blue">App</Tag>
-                  {detail.reason && <Tag color="default">{detail.reason}</Tag>}
-                </Space>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {dayjs(detail.timestamp).format("DD/MM/YYYY HH:mm")} (
-                  {dayjs(detail.timestamp).fromNow()})
-                </Text>
-              </Space>
-            </div>
-          ),
-        }))}
-      />
-    );
-  };
-
   // Table columns configuration
   const columns = [
     {
@@ -210,58 +175,149 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
           type="info"
           showIcon
           icon={<InfoCircleOutlined />}
+          style={{ margin: "16px" }}
         />
       );
     }
 
     return (
-      <div style={{ padding: "16px", backgroundColor: "#f9f9f9" }}>
-        <Timeline
-          mode="left"
-          items={record.daily_modifications.map((group) => ({
-            label: (
-              <Text strong>
-                {dayjs(group.date).format("dddd, D MMMM YYYY")}
-              </Text>
-            ),
-            children: (
+      <div style={{ padding: "20px", backgroundColor: "#f9f9f9" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {record.daily_modifications.map((group, index) => (
+            <div
+              key={group.date}
+              style={{
+                display: "flex",
+                width: "100%",
+                gap: "20px",
+                alignItems: "flex-start",
+              }}
+            >
+              {/* Date section */}
               <div
                 style={{
-                  padding: "12px",
-                  border: "1px solid #f0f0f0",
-                  borderRadius: "8px",
-                  backgroundColor: "#fff",
+                  minWidth: "140px",
+                  textAlign: "left",
+                  paddingTop: "8px",
                 }}
               >
-                <Space
-                  align="center"
-                  style={{ width: "100%", marginBottom: "12px" }}
+                <Text strong style={{ fontSize: "16px", display: "block" }}>
+                  {dayjs(group.date).format("DD/MM/YYYY")}
+                </Text>
+                <Text
+                  type="secondary"
+                  style={{ fontSize: "12px", display: "block" }}
                 >
-                  <Title level={5} style={{ margin: 0 }}>
-                    Riepilogo giornaliero
-                  </Title>
-                  <NetChangeTag value={group.app_net_change} />
-                </Space>
+                  {dayjs(group.date).format("dddd")}
+                </Text>
+              </div>
 
-                <Title
-                  level={5}
+              {/* Timeline connector */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  paddingTop: "8px",
+                }}
+              >
+                <div
                   style={{
-                    marginTop: "16px",
-                    marginBottom: "8px",
-                    color: "#1890ff",
+                    width: "12px",
+                    height: "12px",
+                    borderRadius: "50%",
+                    backgroundColor: "#1890ff",
+                    border: "2px solid #fff",
+                    boxShadow: "0 0 0 2px #1890ff",
                   }}
-                >
-                  <AppstoreOutlined /> Modifiche App
-                </Title>
-                {group.app_details.length > 0 ? (
-                  formatModificationTimeline(group.app_details)
-                ) : (
-                  <Text type="secondary">Nessuna modifica app.</Text>
+                />
+                {index < record.daily_modifications.length - 1 && (
+                  <div
+                    style={{
+                      width: "2px",
+                      height: "80px",
+                      backgroundColor: "#e6f4ff",
+                      marginTop: "4px",
+                    }}
+                  />
                 )}
               </div>
-            ),
-          }))}
-        />
+
+              {/* Content section */}
+              <div style={{ flex: 1 }}>
+                <div
+                  style={{
+                    padding: "16px",
+                    border: "1px solid #e6f4ff",
+                    borderRadius: "8px",
+                    backgroundColor: "#fff",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <Space
+                    align="center"
+                    style={{
+                      width: "100%",
+                      marginBottom: "16px",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Title level={5} style={{ margin: 0, color: "#1890ff" }}>
+                      <AppstoreOutlined style={{ marginRight: "8px" }} />
+                      Modifiche App
+                    </Title>
+                    <NetChangeTag value={group.app_net_change} />
+                  </Space>
+
+                  {group.app_details.length > 0 ? (
+                    <div style={{ marginLeft: "0" }}>
+                      {group.app_details.map((detail, detailIndex) => (
+                        <div
+                          key={detailIndex}
+                          style={{
+                            padding: "12px 0",
+                            borderBottom:
+                              detailIndex < group.app_details.length - 1
+                                ? "1px solid #f0f0f0"
+                                : "none",
+                          }}
+                        >
+                          <Space
+                            direction="vertical"
+                            size={4}
+                            style={{ width: "100%" }}
+                          >
+                            <Space>
+                              <Text strong style={{ fontSize: "14px" }}>
+                                {detail.change > 0
+                                  ? `+${detail.change}`
+                                  : detail.change}
+                              </Text>
+                              <Tag color="blue">App</Tag>
+                              {detail.reason && (
+                                <Tag color="default">{detail.reason}</Tag>
+                              )}
+                            </Space>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              {dayjs(detail.timestamp).format(
+                                "DD/MM/YYYY HH:mm"
+                              )}{" "}
+                              ({dayjs(detail.timestamp).fromNow()})
+                            </Text>
+                          </Space>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <Text type="secondary" style={{ fontStyle: "italic" }}>
+                      Nessuna modifica registrata per questo giorno.
+                    </Text>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -316,16 +372,6 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
             )}
           </Space>
         </div>
-
-        {data && data.variants.some((v) => v.discrepancy) && (
-          <Alert
-            message="Discrepanze Rilevate"
-            description="Alcune varianti mostrano differenze tra le modifiche dell'app e quelle di Shopify. Controlla i dettagli espandendo le righe evidenziate."
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-        )}
 
         <Spin spinning={loading} size="large">
           {data ? (

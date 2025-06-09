@@ -18,8 +18,14 @@ import {
 } from "@ant-design/icons";
 import { useLogs } from "../contexts/LogContext";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import "dayjs/locale/it";
 
-const { Text, Title } = Typography;
+// Configure dayjs
+dayjs.extend(relativeTime);
+dayjs.locale("it");
+
+const { Text } = Typography;
 const { Search } = Input;
 
 const DataPage: React.FC = () => {
