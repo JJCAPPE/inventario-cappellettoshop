@@ -87,109 +87,297 @@ pub async fn search_products(
     Ok(result)
 }
 
-/// Search products by SKU across all variants
-/// Since Shopify doesn't have a direct SKU search endpoint, we fetch all products and filter
+/// Search products by SKU using GraphQL - much more efficient than REST pagination
 #[tauri::command]
-pub async fn search_products_by_sku(
+pub async fn search_products_by_sku_graphql(
     config: State<'_, AppConfig>,
     sku: String,
 ) -> Result<Vec<Product>, String> {
     let client = reqwest::Client::new();
+    let graphql_url = format!(
+        "https://{}/admin/api/{}/graphql.json",
+        config.shop_domain, config.api_version
+    );
 
-    // Fetch more products - Shopify allows up to 250 per request
-    let url = config.get_api_url("products.json?limit=250&status=active");
+    println!("🎯 GraphQL SKU Search for: '{}'", sku);
 
-    println!("🔍 Fetching products from URL: {}", url);
+    // Use GraphQL to search for products by SKU - much more efficient
+    let query = format!(
+        r#"
+        {{
+            products(first: 50, query: "sku:{} status:active") {{
+                edges {{
+                    node {{
+                        id
+                        title
+                        handle
+                        descriptionHtml
+                        updatedAt
+                        priceRangeV2 {{
+                            minVariantPrice {{
+                                amount
+                            }}
+                        }}
+                        images(first: 5) {{
+                            edges {{
+                                node {{
+                                    src
+                                }}
+                            }}
+                        }}
+                        variants(first: 50) {{
+                            edges {{
+                                node {{
+                                    id
+                                    title
+                                    inventoryItem {{
+                                        id
+                                    }}
+                                    inventoryQuantity
+                                    price
+                                    sku
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }}
+        "#,
+        sku
+    );
+
+    let request_body = serde_json::json!({
+        "query": query
+    });
 
     let response = client
-        .get(&url)
+        .post(&graphql_url)
         .headers(config.get_headers())
+        .json(&request_body)
         .send()
         .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+        .map_err(|e| format!("GraphQL request failed: {}", e))?;
 
-    let data: Value = response
-        .json()
+    let response_text = response
+        .text()
         .await
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        .map_err(|e| format!("Failed to read response: {}", e))?;
 
-    let products = data["products"].as_array().ok_or("No products found")?;
+    println!("📡 GraphQL Response received");
 
-    println!("📊 Total products fetched: {}", products.len());
+    let data: Value = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse GraphQL response: {}", e))?;
+
+    if let Some(errors) = data["errors"].as_array() {
+        println!("❌ GraphQL Errors: {:?}", errors);
+        return Err(format!("GraphQL errors: {:?}", errors));
+    }
+
+    let products = data["data"]["products"]["edges"]
+        .as_array()
+        .ok_or("No products found in GraphQL response")?;
+
+    println!("📊 GraphQL returned {} products", products.len());
 
     let mut result = Vec::new();
-    let mut all_skus = Vec::new();
+    for edge in products {
+        let product_node = &edge["node"];
 
-    // Filter products that have variants matching the SKU
-    for (i, product) in products.iter().enumerate() {
-        if let Some(variants) = product["variants"].as_array() {
-            println!(
-                "🔍 Product {}: {} has {} variants",
-                i + 1,
-                product["title"].as_str().unwrap_or("Unknown"),
-                variants.len()
-            );
+        // Convert GraphQL response to our Product struct
+        let product = convert_graphql_product_to_product(product_node)?;
 
-            for (j, variant) in variants.iter().enumerate() {
-                if let Some(variant_sku) = variant["sku"].as_str() {
-                    all_skus.push(variant_sku.to_string());
-                    println!("  📦 Variant {}: SKU = '{}'", j + 1, variant_sku);
+        // Check if any variant has the exact SKU we're looking for
+        let has_matching_sku = product.variants.iter().any(|v| {
+            v.sku
+                .as_ref()
+                .map_or(false, |s| s.eq_ignore_ascii_case(&sku))
+        });
 
-                    if variant_sku.to_lowercase().contains(&sku.to_lowercase()) {
-                        println!("✅ MATCH FOUND! SKU '{}' contains '{}'", variant_sku, sku);
-                        let parsed_product = parse_product_from_json(product)?;
-                        result.push(parsed_product);
-                        break; // Don't add the same product multiple times
-                    }
-                } else {
-                    println!("  ⚠️ Variant {} has no SKU", j + 1);
-                }
-            }
-        } else {
-            println!("⚠️ Product has no variants array");
+        if has_matching_sku {
+            println!("✅ Found product with matching SKU: {}", product.title);
+            result.push(product);
         }
     }
 
-    println!("🎯 Searched for SKU: '{}'", sku);
     println!(
-        "📋 All SKUs found: {:?}",
-        &all_skus[..std::cmp::min(all_skus.len(), 10)]
-    ); // Show first 10 SKUs
-    if all_skus.len() > 10 {
-        println!("   ... and {} more SKUs", all_skus.len() - 10);
-    }
-    println!("🔍 Total unique SKUs: {}", all_skus.len());
-    println!("✅ Products matching SKU '{}': {}", sku, result.len());
-
+        "🎯 GraphQL SKU search for '{}' found {} products",
+        sku,
+        result.len()
+    );
     Ok(result)
+}
+
+/// Find exact product by SKU using GraphQL - returns the first exact match with variant info
+#[tauri::command]
+pub async fn find_product_by_exact_sku_graphql(
+    config: State<'_, AppConfig>,
+    sku: String,
+) -> Result<Option<(Product, String)>, String> {
+    let client = reqwest::Client::new();
+    let graphql_url = format!(
+        "https://{}/admin/api/{}/graphql.json",
+        config.shop_domain, config.api_version
+    );
+
+    println!("🎯 Looking for EXACT SKU match via GraphQL: '{}'", sku);
+
+    // Search for products that contain this SKU
+    let query = format!(
+        r#"
+        {{
+            products(first: 10, query: "sku:{} status:active") {{
+                edges {{
+                    node {{
+                        id
+                        title
+                        handle
+                        descriptionHtml
+                        updatedAt
+                        priceRangeV2 {{
+                            minVariantPrice {{
+                                amount
+                            }}
+                        }}
+                        images(first: 5) {{
+                            edges {{
+                                node {{
+                                    src
+                                }}
+                            }}
+                        }}
+                        variants(first: 50) {{
+                            edges {{
+                                node {{
+                                    id
+                                    title
+                                    inventoryItem {{
+                                        id
+                                    }}
+                                    inventoryQuantity
+                                    price
+                                    sku
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+        }}
+        "#,
+        sku
+    );
+
+    let request_body = serde_json::json!({
+        "query": query
+    });
+
+    let response = client
+        .post(&graphql_url)
+        .headers(config.get_headers())
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("GraphQL request failed: {}", e))?;
+
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+
+    let data: Value = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse GraphQL response: {}", e))?;
+
+    if let Some(errors) = data["errors"].as_array() {
+        println!("❌ GraphQL Errors: {:?}", errors);
+        return Err(format!("GraphQL errors: {:?}", errors));
+    }
+
+    let products = data["data"]["products"]["edges"]
+        .as_array()
+        .ok_or("No products found in GraphQL response")?;
+
+    println!(
+        "📊 GraphQL returned {} products for exact SKU search",
+        products.len()
+    );
+
+    // Look for exact SKU match in the returned products
+    for edge in products {
+        let product_node = &edge["node"];
+        let product = convert_graphql_product_to_product(product_node)?;
+
+        // Clone product to avoid borrow checker issues
+        let product_clone = product.clone();
+
+        // Find the variant with the exact matching SKU
+        for variant in &product_clone.variants {
+            if let Some(variant_sku) = &variant.sku {
+                if variant_sku.eq_ignore_ascii_case(&sku) {
+                    println!(
+                        "✅ EXACT MATCH FOUND! Product: '{}', Variant: '{}', SKU: '{}'",
+                        product.title, variant.title, variant_sku
+                    );
+                    return Ok(Some((product, variant.inventory_item_id.clone())));
+                }
+            }
+        }
+    }
+
+    println!("❌ No exact SKU match found for: '{}'", sku);
+    Ok(None)
 }
 
 /// Enhanced search that looks for both title and SKU matches
 #[tauri::command]
-pub async fn search_products_enhanced(
+pub async fn enhanced_search_products(
     config: State<'_, AppConfig>,
     query: String,
 ) -> Result<Vec<Product>, String> {
     println!("🚀 Enhanced search starting for query: '{}'", query);
-
     let mut result = Vec::new();
     let mut found_product_ids = std::collections::HashSet::new();
 
-    // First try GraphQL-based partial title search (much better than REST)
-    println!("🔍 Phase 1: GraphQL title search with partial matching");
-    match search_products_by_name_graphql(config.clone(), query.clone(), None, None).await {
-        Ok(graphql_products) => {
-            println!(
-                "✅ GraphQL search returned {} products",
-                graphql_products.len()
-            );
-            for product in graphql_products {
+    // PHASE 1: Check if query is an exact SKU match
+    if query.trim().len() > 5 {
+        // SKUs are typically longer than 5 characters
+        println!("🔍 Phase 1: Checking for exact SKU match");
+        match find_product_by_exact_sku_graphql(config.clone(), query.trim().to_string()).await {
+            Ok(Some((product, _variant_id))) => {
+                println!("✅ Found exact SKU match, returning immediately");
                 found_product_ids.insert(product.id.clone());
                 result.push(product);
+                return Ok(result); // Return immediately for exact SKU match
+            }
+            Ok(None) => {
+                println!("🔍 No exact SKU match found, continuing to title search");
+            }
+            Err(e) => {
+                println!("⚠️ SKU search failed: {}", e);
+            }
+        }
+    }
+
+    // PHASE 2: Title search using GraphQL
+    println!("🔍 Phase 2: GraphQL title search");
+    match search_products_by_name_graphql(config.clone(), query.clone(), None, None).await {
+        Ok(title_products) => {
+            println!(
+                "✅ GraphQL title search returned {} products",
+                title_products.len()
+            );
+            for product in title_products {
+                if !found_product_ids.contains(&product.id) {
+                    found_product_ids.insert(product.id.clone());
+                    result.push(product);
+                }
             }
         }
         Err(e) => {
-            println!("⚠️ GraphQL search failed, falling back to REST: {}", e);
+            println!(
+                "⚠️ GraphQL title search failed, falling back to REST: {}",
+                e
+            );
             // Fallback to REST API title search if GraphQL fails
             let client = reqwest::Client::new();
             let encoded_query = urlencoding::encode(&query);
@@ -207,8 +395,10 @@ pub async fn search_products_enhanced(
                         if let Some(products) = title_data["products"].as_array() {
                             for product in products {
                                 if let Ok(parsed_product) = parse_product_from_json(product) {
-                                    found_product_ids.insert(parsed_product.id.clone());
-                                    result.push(parsed_product);
+                                    if !found_product_ids.contains(&parsed_product.id) {
+                                        found_product_ids.insert(parsed_product.id.clone());
+                                        result.push(parsed_product);
+                                    }
                                 }
                             }
                         }
@@ -219,10 +409,13 @@ pub async fn search_products_enhanced(
         }
     }
 
-    // If we still have few results, also search by SKU
+    // PHASE 3: If we still have few results, also search by SKU (partial matches)
     if result.len() < 10 {
-        println!("🔍 Phase 2: SKU search (current results: {})", result.len());
-        match search_products_by_sku(config, query.clone()).await {
+        println!(
+            "🔍 Phase 3: SKU partial search (current results: {})",
+            result.len()
+        );
+        match search_products_by_sku_graphql(config.clone(), query.clone()).await {
             Ok(sku_results) => {
                 println!("✅ SKU search returned {} products", sku_results.len());
                 for product in sku_results {
@@ -246,52 +439,67 @@ pub async fn search_products_enhanced(
     Ok(result)
 }
 
-/// Find exact product by SKU - returns the first exact match
-#[tauri::command]
-pub async fn find_product_by_exact_sku(
-    config: State<'_, AppConfig>,
-    sku: String,
-) -> Result<Option<Product>, String> {
-    let client = reqwest::Client::new();
-    let url = config.get_api_url("products.json?limit=250&status=active");
+/// Helper function to convert GraphQL product response to our Product struct
+fn convert_graphql_product_to_product(product_node: &Value) -> Result<Product, String> {
+    let id = product_node["id"]
+        .as_str()
+        .ok_or("Product ID missing")?
+        .replace("gid://shopify/Product/", "");
 
-    println!("🎯 Looking for EXACT SKU match: '{}'", sku);
+    let title = product_node["title"]
+        .as_str()
+        .ok_or("Product title missing")?
+        .to_string();
 
-    let response = client
-        .get(&url)
-        .headers(config.get_headers())
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let handle = product_node["handle"].as_str().unwrap_or("").to_string();
 
-    let data: Value = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let description = product_node["descriptionHtml"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
 
-    let products = data["products"].as_array().ok_or("No products found")?;
+    let price = product_node["priceRangeV2"]["minVariantPrice"]["amount"]
+        .as_str()
+        .unwrap_or("0.00")
+        .to_string();
 
-    println!(
-        "📊 Checking {} products for exact SKU match",
-        products.len()
-    );
+    let images: Vec<String> = product_node["images"]["edges"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .map(|edge| edge["node"]["src"].as_str().unwrap_or("").to_string())
+        .collect();
 
-    // Look for exact SKU match
-    for product in products {
-        if let Some(variants) = product["variants"].as_array() {
-            for variant in variants {
-                if let Some(variant_sku) = variant["sku"].as_str() {
-                    if variant_sku.eq_ignore_ascii_case(&sku) {
-                        println!("✅ EXACT MATCH FOUND! SKU: '{}'", variant_sku);
-                        return Ok(Some(parse_product_from_json(product)?));
-                    }
-                }
+    let variants: Vec<ProductVariant> = product_node["variants"]["edges"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .map(|edge| {
+            let variant_node = &edge["node"];
+            ProductVariant {
+                title: variant_node["title"].as_str().unwrap_or("").to_string(),
+                inventory_item_id: variant_node["inventoryItem"]["id"]
+                    .as_str()
+                    .unwrap_or("")
+                    .replace("gid://shopify/InventoryItem/", ""),
+                inventory_quantity: variant_node["inventoryQuantity"].as_i64().unwrap_or(0) as i32,
+                price: variant_node["price"].as_str().unwrap_or("0.00").to_string(),
+                sku: variant_node["sku"].as_str().map(|s| s.to_string()),
             }
-        }
-    }
+        })
+        .collect();
 
-    println!("❌ No exact match found for SKU: '{}'", sku);
-    Ok(None)
+    Ok(Product {
+        id,
+        title,
+        handle,
+        description,
+        price,
+        total_inventory: variants.iter().map(|v| v.inventory_quantity).sum(),
+        images,
+        variants,
+        locations: std::collections::HashMap::new(),
+    })
 }
 
 fn clean_html_description(html: &str) -> String {

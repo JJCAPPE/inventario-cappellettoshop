@@ -587,8 +587,6 @@ const HomePage: React.FC<HomePageProps> = ({
                   setQuery={setQuery}
                   onSelect={handleSearchSelect}
                   onAutoSelect={handleSearchSelect}
-                  sortKey={searchSortKey}
-                  sortReverse={searchSortReverse}
                 />
               </div>
 

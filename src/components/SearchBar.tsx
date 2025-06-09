@@ -8,8 +8,6 @@ interface SearchBarProps {
   setQuery: (query: string) => void;
   onSelect: (id: string, query: string) => void;
   onAutoSelect?: (id: string, query: string) => void;
-  sortKey?: string;
-  sortReverse?: boolean;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -17,8 +15,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
   setQuery,
   onSelect,
   onAutoSelect,
-  sortKey = "RELEVANCE",
-  sortReverse = false,
 }) => {
   const [options, setOptions] = useState<
     Array<{ value: string; label: React.ReactNode }>
@@ -38,142 +34,90 @@ const SearchBar: React.FC<SearchBarProps> = ({
     setLoading(true);
     setSearchStatus(""); // Reset status while searching
     try {
-      console.log("🚀 SearchBar: Starting concurrent search for:", searchQuery);
+      console.log("🚀 SearchBar: Starting enhanced search for:", searchQuery);
 
-      // Start both searches concurrently
-      const skuSearchPromise = searchQuery.trim()
-        ? TauriAPI.Product.findProductByExactSku(searchQuery.trim()).catch(
-            () => null
-          )
-        : Promise.resolve(null);
-
-      const graphqlSearchPromise = TauriAPI.Product.searchProductsByNameGraphQL(
-        searchQuery,
-        sortKey,
-        sortReverse
-      ).catch(() => []);
-
-      console.log("🏷️ SearchBar: Started exact SKU search for:", searchQuery);
-      console.log(
-        "🔍 SearchBar: Started GraphQL title search for:",
+      // Use the new enhanced search that handles SKU-first logic
+      const products = await TauriAPI.Product.enhancedSearchProducts(
         searchQuery
       );
+
       console.log(
-        "📊 SearchBar: Using sort key:",
-        sortKey,
-        "reverse:",
-        sortReverse
+        "✅ SearchBar: Enhanced search returned",
+        products.length,
+        "products"
       );
 
-      // Wait for both searches to complete
-      const [skuProduct, products] = await Promise.all([
-        skuSearchPromise,
-        graphqlSearchPromise,
-      ]);
+      // If we got exactly 1 product and the search query looks like an SKU,
+      // check if it's an exact SKU match for auto-selection
+      if (products.length === 1 && searchQuery.trim().length > 5) {
+        const product = products[0];
+        const matchingVariant = product.variants.find(
+          (v) =>
+            v.sku && v.sku.toLowerCase() === searchQuery.trim().toLowerCase()
+        );
 
-      // Check if we found an exact SKU match
-      if (skuProduct) {
-        console.log("✅ SearchBar: Found exact SKU match:", skuProduct.title);
-        // Auto-select the SKU match immediately
-        if (onAutoSelect) {
-          onAutoSelect(skuProduct.id, searchQuery);
+        if (matchingVariant && onAutoSelect) {
+          console.log(
+            "✅ SearchBar: Exact SKU match found, auto-selecting:",
+            product.title
+          );
+          onAutoSelect(product.id, searchQuery);
           setOptions([]);
           return;
         }
       }
 
-      console.log(
-        `✅ SearchBar: GraphQL search returned ${products.length} products`
-      );
-
-      // If GraphQL didn't return enough results, also try enhanced search as fallback
-      let allProducts = products;
-      if (products.length < 10) {
-        try {
-          console.log(
-            "🔄 SearchBar: Adding enhanced search results as fallback"
-          );
-          const enhancedProducts =
-            await TauriAPI.Product.searchProductsEnhanced(searchQuery);
-
-          // Combine and deduplicate results
-          const existingIds = new Set(products.map((p) => p.id));
-          const newProducts = enhancedProducts.filter(
-            (p) => !existingIds.has(p.id)
-          );
-          allProducts = [...products, ...newProducts];
-
-          console.log(
-            `📊 SearchBar: Combined search returned ${allProducts.length} total products`
-          );
-        } catch (error) {
-          console.log(
-            "⚠️ SearchBar: Enhanced search fallback failed, using GraphQL results only"
-          );
-        }
-      }
+      // Process all products for display
+      const allProducts = products;
 
       const searchOptions = allProducts.map((product) => ({
         value: product.id,
         label: (
           <div
-            style={{ display: "flex", alignItems: "center", padding: "4px 0" }}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "4px 0",
+            }}
           >
-            {product.images && product.images.length > 0 ? (
-              <img
-                src={product.images[0]}
-                alt={product.title}
-                style={{
-                  width: 32,
-                  height: 32,
-                  marginRight: 8,
-                  borderRadius: 4,
-                  objectFit: "cover",
-                }}
-                onError={(e) => {
-                  // Fallback to placeholder if image fails to load
-                  console.log(
-                    "🖼️ SearchBar: Image failed to load, using placeholder for:",
-                    product.title
-                  );
-                  e.currentTarget.src = "https://via.placeholder.com/32";
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  marginRight: 8,
-                  borderRadius: 4,
-                  backgroundColor: "#f0f0f0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "10px",
-                  color: "#999",
-                }}
-              >
-                IMG
-              </div>
-            )}
-            <div style={{ flex: 1, lineHeight: 1.3 }}>
-              <div
-                style={{ fontWeight: 500, marginBottom: 1, fontSize: "14px" }}
-              >
-                {product.title}
-              </div>
-              {product.variants &&
-                product.variants.length > 0 &&
-                product.variants[0].sku && (
-                  <div
-                    style={{ fontSize: "11px", color: "#666", marginBottom: 1 }}
-                  >
-                    SKU: {product.variants[0].sku}
-                  </div>
-                )}
-              <div style={{ fontSize: "11px", color: "#999" }}>
-                €{product.price} • {product.total_inventory} in stock
+            <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
+              {product.images && product.images.length > 0 && (
+                <img
+                  src={product.images[0]}
+                  alt={product.title}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    objectFit: "cover",
+                    borderRadius: 4,
+                    marginRight: 10,
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              <div style={{ flex: 1, lineHeight: 1.3 }}>
+                <div
+                  style={{ fontWeight: 500, marginBottom: 1, fontSize: "14px" }}
+                >
+                  {product.title}
+                </div>
+                {product.variants &&
+                  product.variants.length > 0 &&
+                  product.variants[0].sku && (
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#666",
+                        marginBottom: 1,
+                      }}
+                    >
+                      SKU: {product.variants[0].sku}
+                    </div>
+                  )}
+                <div style={{ fontSize: "11px", color: "#999" }}>
+                  €{product.price} • {product.total_inventory} in stock
+                </div>
               </div>
             </div>
           </div>
@@ -209,23 +153,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
         setOptions(searchOptions);
       }
     } catch (error) {
-      console.error("❌ SearchBar: Error searching products:", error);
+      console.error("❌ SearchBar: Search failed:", error);
       setSearchStatus("error");
-
-      // Show user-friendly error in development mode
-      if (import.meta.env.DEV) {
-        const errorOption = {
-          value: "error",
-          label: (
-            <div style={{ color: "#ff4d4f", padding: "8px" }}>
-              Error: {error instanceof Error ? error.message : "Search failed"}
-            </div>
-          ),
-        };
-        setOptions([errorOption]);
-      } else {
-        setOptions([]);
-      }
+      setOptions([]);
     } finally {
       setLoading(false);
     }

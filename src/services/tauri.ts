@@ -167,23 +167,68 @@ export class ProductAPI {
   }
 
   /**
-   * Find exact product by SKU - returns single match or null
+   * Enhanced search - checks SKU first, then falls back to title search
    */
-  static async findProductByExactSku(sku: string): Promise<Product | null> {
+  static async enhancedSearchProducts(query: string): Promise<Product[]> {
     try {
-      const result = await invoke<Product | null>("find_product_by_exact_sku", {
+      const result = await invoke<Product[]>("enhanced_search_products", {
+        query,
+      });
+      console.log(
+        `🔍 Raw API Response - enhanced_search_products (${query}):`,
+        result
+      );
+      return result;
+    } catch (error) {
+      console.error("Error in enhanced search:", error);
+      throw new Error(`Failed to search products: ${error}`);
+    }
+  }
+
+  /**
+   * Search products by SKU using GraphQL
+   */
+  static async searchProductsBySkuGraphQL(sku: string): Promise<Product[]> {
+    try {
+      const result = await invoke<Product[]>("search_products_by_sku_graphql", {
         sku,
       });
       console.log(
-        `🔍 Raw API Response - find_product_by_exact_sku (${sku}):`,
+        `🔍 Raw API Response - search_products_by_sku_graphql (${sku}):`,
+        result
+      );
+      return result;
+    } catch (error) {
+      console.error("Error searching products by SKU with GraphQL:", error);
+      throw new Error(`Failed to search products by SKU: ${error}`);
+    }
+  }
+
+  /**
+   * Find exact product by SKU using GraphQL - returns product and matching variant ID
+   */
+  static async findProductByExactSkuGraphQL(
+    sku: string
+  ): Promise<{ product: Product; variantInventoryItemId: string } | null> {
+    try {
+      const result = await invoke<[Product, string] | null>(
+        "find_product_by_exact_sku_graphql",
+        { sku }
+      );
+      console.log(
+        `🔍 Raw API Response - find_product_by_exact_sku_graphql (${sku}):`,
         result
       );
       if (result) {
-        console.log(`✅ Found exact SKU match: ${result.title}`);
+        const [product, variantInventoryItemId] = result;
+        console.log(
+          `✅ Found exact SKU match: ${product.title}, variant: ${variantInventoryItemId}`
+        );
+        return { product, variantInventoryItemId };
       } else {
         console.log(`❌ No exact SKU match found for: ${sku}`);
+        return null;
       }
-      return result;
     } catch (error) {
       console.error("Error finding product by exact SKU:", error);
       throw new Error(`Failed to find product by SKU: ${error}`);

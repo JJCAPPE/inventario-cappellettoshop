@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Layout, Button, Drawer, ConfigProvider } from "antd";
 
-import { DatabaseOutlined, HistoryOutlined, CloseOutlined } from "@ant-design/icons";
+import { DatabaseOutlined, CloseOutlined } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
 import StatisticsPage from "./components/StatisticsPage";
@@ -74,7 +74,6 @@ function App() {
   const [targetProductId, setTargetProductId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-
   useEffect(() => {
     document.title = "Inventario Cappelletto Shop";
   }, []);
@@ -85,7 +84,6 @@ function App() {
     setTargetProductId(productId);
     setSidebarVisible(false); // Close the sidebar when navigating
   };
-
 
   // Simplified toggle function
   const handleDataPanelToggle = (e: React.MouseEvent) => {

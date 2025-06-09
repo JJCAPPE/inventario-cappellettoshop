@@ -29,10 +29,10 @@ fn main() {
             products::get_products,
             products::get_product_by_id,
             products::search_products,
-            products::search_products_by_sku,
-            products::search_products_enhanced,
+            products::search_products_by_sku_graphql,
+            products::enhanced_search_products,
             products::search_products_by_name_graphql,
-            products::find_product_by_exact_sku,
+            products::find_product_by_exact_sku_graphql,
             // Inventory commands
             inventory::get_inventory_levels,
             inventory::get_inventory_levels_for_locations,
