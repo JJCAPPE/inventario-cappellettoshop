@@ -594,14 +594,11 @@ const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div style={{ padding: 24 }}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-        <Col>
+      <Row gutter={24} style={{ marginBottom: 24 }} align="middle">
+        <Col span={3}>
           <Badge count={version} color="#FFF2E3" style={{ color: "#492513" }} />
         </Col>
-      </Row>
-
-      <Row gutter={24} style={{ marginBottom: 24 }}>
-        <Col span={18} offset={3}>
+        <Col span={18}>
           <Space direction="vertical" style={{ width: "100%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div style={{ flex: 1 }}>
@@ -631,6 +628,7 @@ const HomePage: React.FC<HomePageProps> = ({
             </div>
           </Space>
         </Col>
+        <Col span={3}></Col>
       </Row>
 
       <Divider />
