@@ -631,6 +631,20 @@ export class FirebaseAPI {
       throw new Error(`Failed to fetch product logs: ${error}`);
     }
   }
+
+  /**
+   * Create a check request document in Firebase
+   */
+  static async createCheckRequest(checkRequest: any): Promise<void> {
+    try {
+      console.log("🔄 Creating check request in Firebase:", checkRequest);
+      await invoke("create_check_request", { checkRequest });
+      console.log("✅ Check request created successfully");
+    } catch (error) {
+      console.error("❌ Error creating check request:", error);
+      throw new Error(`Failed to create check request: ${error}`);
+    }
+  }
 }
 
 // Location API functions

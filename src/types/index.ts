@@ -6,6 +6,7 @@ export interface ProductDetails {
   descrizioneArticolo: string;
   immaginiArticolo: string[];
   varaintiArticolo: Array<{
+    variant_id: string;
     inventory_item_id: string;
     title: string;
     inventory_quantity: number;
@@ -15,6 +16,7 @@ export interface ProductDetails {
 
 export interface SecondaryDetails {
   availableVariants: Array<{
+    variant_id: string;
     inventory_item_id: string;
     title: string;
     inventory_quantity: number;
@@ -50,6 +52,7 @@ export interface Product {
 }
 
 export interface ProductVariant {
+  variant_id: string;
   inventory_item_id: string;
   title: string;
   inventory_quantity: number;

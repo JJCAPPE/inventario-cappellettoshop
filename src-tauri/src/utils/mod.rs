@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProductVariant {
+    pub variant_id: String,
     pub inventory_item_id: String,
     pub title: String,
     pub inventory_quantity: i32,

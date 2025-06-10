@@ -477,6 +477,10 @@ fn convert_graphql_product_to_product(product_node: &Value) -> Result<Product, S
         .map(|edge| {
             let variant_node = &edge["node"];
             ProductVariant {
+                variant_id: variant_node["id"]
+                    .as_str()
+                    .unwrap_or("")
+                    .replace("gid://shopify/ProductVariant/", ""),
                 title: variant_node["title"].as_str().unwrap_or("").to_string(),
                 inventory_item_id: variant_node["inventoryItem"]["id"]
                     .as_str()
@@ -557,6 +561,7 @@ fn parse_product_from_json(product: &Value) -> Result<Product, String> {
             vars.iter()
                 .filter_map(|var| {
                     Some(ProductVariant {
+                        variant_id: var["id"].as_u64()?.to_string(),
                         inventory_item_id: var["inventory_item_id"].as_u64()?.to_string(),
                         title: var["title"].as_str().unwrap_or("Default").to_string(),
                         inventory_quantity: var["inventory_quantity"].as_i64().unwrap_or(0) as i32,
@@ -741,7 +746,11 @@ pub async fn search_products_by_name_graphql(
                         let inventory_item_id =
                             gql_inventory_item_id.split('/').last()?.to_string();
 
+                        let gql_variant_id = var_node["id"].as_str()?;
+                        let variant_id = gql_variant_id.split('/').last()?.to_string();
+
                         Some(ProductVariant {
+                            variant_id,
                             inventory_item_id,
                             title: var_node["title"].as_str().unwrap_or("Default").to_string(),
                             inventory_quantity: var_node["inventoryQuantity"].as_i64().unwrap_or(0)
