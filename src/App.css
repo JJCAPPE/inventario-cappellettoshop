@@ -217,7 +217,16 @@
 }
 
 .search-dropdown-large .ant-select-item {
-    padding: 4px 12px !important;
+    padding: 6px 8px !important;
+    min-height: 78px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.search-dropdown-large .ant-select-item-option-content {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
 }
 
 .search-dropdown-large .rc-virtual-list-holder {

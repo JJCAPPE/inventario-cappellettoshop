@@ -85,7 +85,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              padding: "4px 0",
+              padding: "2px 4px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
@@ -94,18 +94,26 @@ const SearchBar: React.FC<SearchBarProps> = ({
                   src={product.images[0]}
                   alt={product.title}
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: 80,
+                    height: 70,
                     objectFit: "cover",
-                    borderRadius: 4,
-                    marginRight: 10,
+                    borderRadius: 6,
+                    marginRight: 12,
                     flexShrink: 0,
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
                   }}
                 />
               )}
-              <div style={{ flex: 1, lineHeight: 1.3 }}>
+              <div style={{ flex: 1, lineHeight: 1.2 }}>
                 <div
-                  style={{ fontWeight: 500, marginBottom: 1, fontSize: "14px" }}
+                  style={{
+                    fontWeight: 500,
+                    marginBottom: 2,
+                    fontSize: "13px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
                 >
                   {product.title}
                 </div>
@@ -114,7 +122,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                   product.variants[0].sku && (
                     <div
                       style={{
-                        fontSize: "11px",
+                        fontSize: "10px",
                         color: "#666",
                         marginBottom: 1,
                       }}
@@ -122,7 +130,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                       SKU: {product.variants[0].sku}
                     </div>
                   )}
-                <div style={{ fontSize: "11px", color: "#999" }}>
+                <div style={{ fontSize: "10px", color: "#999" }}>
                   €{product.price} • {product.total_inventory} in stock
                 </div>
               </div>
