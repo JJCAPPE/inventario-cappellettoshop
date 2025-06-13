@@ -98,6 +98,7 @@ fn test_config_headers() {
 #[test]
 fn test_product_creation() {
     let variant = ProductVariant {
+        variant_id: "12345".to_string(),
         inventory_item_id: "12345".to_string(),
         title: "Test Variant".to_string(),
         inventory_quantity: 10,

@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Layout, Button, Drawer, ConfigProvider } from "antd";
 
-import { DatabaseOutlined, CloseOutlined } from "@ant-design/icons";
+import {
+  DatabaseOutlined,
+  CloseOutlined,
+  CheckCircleOutlined,
+} from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
+import CheckRequestsPage from "./components/CheckRequestsPage";
 import StatisticsPage from "./components/StatisticsPage";
 import { LogProvider } from "./contexts/LogContext";
 import "antd/dist/reset.css";
@@ -11,7 +16,7 @@ import "./App.css";
 
 const { Header, Content } = Layout;
 
-type SidebarView = "data" | "statistics";
+type SidebarView = "data" | "checkRequests" | "statistics";
 
 // Custom theme configuration
 const customTheme = {
@@ -75,7 +80,7 @@ function App() {
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.title = "Inventario Cappelletto Shop";
+    document.title = "Inventario CappellettoShop";
   }, []);
 
   // Function to handle navigation to a specific product
@@ -90,9 +95,28 @@ function App() {
     e.stopPropagation(); // Prevent event bubbling
     console.log("🔄 Data panel toggle clicked:", { sidebarVisible });
 
-    setSidebarVisible(!sidebarVisible);
-    if (!sidebarVisible) {
+    if (sidebarVisible && currentView === "data") {
+      // If data panel is already open, close it
+      setSidebarVisible(false);
+    } else {
+      // Open data panel or switch to it
       setCurrentView("data");
+      setSidebarVisible(true);
+    }
+  };
+
+  // Function to handle check requests panel toggle
+  const handleCheckRequestsPanelToggle = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent event bubbling
+    console.log("🔄 Check requests panel toggle clicked:", { sidebarVisible });
+
+    if (sidebarVisible && currentView === "checkRequests") {
+      // If checkRequests panel is already open, close it
+      setSidebarVisible(false);
+    } else {
+      // Open checkRequests panel or switch to it
+      setCurrentView("checkRequests");
+      setSidebarVisible(true);
     }
   };
 
@@ -157,6 +181,10 @@ function App() {
     switch (currentView) {
       case "data":
         return <DataPage onNavigateToProduct={handleNavigateToProduct} />;
+      case "checkRequests":
+        return (
+          <CheckRequestsPage onNavigateToProduct={handleNavigateToProduct} />
+        );
       case "statistics":
         return <StatisticsPage />;
       default:
@@ -165,9 +193,16 @@ function App() {
   };
 
   const getSidebarTitle = () => {
-    return currentView === "data"
-      ? "Modifiche Recenti (Ultime 24h)"
-      : "Statistiche";
+    switch (currentView) {
+      case "data":
+        return "Modifiche Recenti (Ultime 24h)";
+      case "checkRequests":
+        return "Richieste di Controllo";
+      case "statistics":
+        return "Statistiche";
+      default:
+        return "Modifiche";
+    }
   };
 
   return (
@@ -194,11 +229,6 @@ function App() {
 
             <div style={{ display: "flex", gap: "8px" }}>
               <Button
-                type={
-                  sidebarVisible && currentView === "data"
-                    ? "primary"
-                    : "default"
-                }
                 className={
                   sidebarVisible && currentView === "data"
                     ? "modifiche-button-active"
@@ -209,11 +239,11 @@ function App() {
                 style={{
                   background:
                     sidebarVisible && currentView === "data"
-                      ? "#FFF2E3"
+                      ? "#FFE8D1"
                       : "transparent",
                   borderColor:
                     sidebarVisible && currentView === "data"
-                      ? "#FFF2E3"
+                      ? "#FFE8D1"
                       : "#d9d9d9",
                   color:
                     sidebarVisible && currentView === "data"
@@ -230,6 +260,40 @@ function App() {
                 {sidebarVisible && currentView === "data"
                   ? "Chiudi Modifiche"
                   : "Modifiche"}
+              </Button>
+
+              <Button
+                className={
+                  sidebarVisible && currentView === "checkRequests"
+                    ? "controlli-button-active"
+                    : ""
+                }
+                icon={<CheckCircleOutlined />}
+                onClick={handleCheckRequestsPanelToggle}
+                style={{
+                  background:
+                    sidebarVisible && currentView === "checkRequests"
+                      ? "#FFE8D1"
+                      : "transparent",
+                  borderColor:
+                    sidebarVisible && currentView === "checkRequests"
+                      ? "#FFE8D1"
+                      : "#d9d9d9",
+                  color:
+                    sidebarVisible && currentView === "checkRequests"
+                      ? "#492513"
+                      : "#d9d9d9",
+                  transition: "all 0.2s ease",
+                }}
+                title={
+                  sidebarVisible && currentView === "checkRequests"
+                    ? "Chiudi pannello richieste"
+                    : "Apri pannello richieste"
+                }
+              >
+                {sidebarVisible && currentView === "checkRequests"
+                  ? "Chiudi Richieste"
+                  : "Richieste"}
               </Button>
             </div>
           </Header>

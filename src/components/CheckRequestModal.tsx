@@ -94,6 +94,7 @@ const CheckRequestModal: React.FC<CheckRequestModalProps> = ({
         timestamp: new Date().toISOString(),
         variant_id: variantId ? parseInt(variantId) : null,
         variant_name: variantName || (values.check_all ? "all" : null),
+        image_url: productDetails.immaginiArticolo[0] || "",
       };
 
       console.log("🔄 Creating check request:", checkRequest);

@@ -39,6 +39,24 @@ export interface LogEntry {
   timestamp: string;
 }
 
+export interface CheckRequest {
+  id?: string; // Document ID from Firebase
+  check_all: boolean;
+  checked: boolean;
+  location: string[];
+  notes: string;
+  priority: "low" | "medium" | "high";
+  product_id: number;
+  product_name: string;
+  requested_by: string;
+  status: "pending" | "completed" | "cancelled";
+  timestamp: string;
+  variant_id: number | null;
+  variant_name: string | null;
+  closing_notes?: string;
+  image_url?: string;
+}
+
 export interface FirebaseConfig {
   api_key: string;
   auth_domain: string;
@@ -643,6 +661,50 @@ export class FirebaseAPI {
     } catch (error) {
       console.error("❌ Error creating check request:", error);
       throw new Error(`Failed to create check request: ${error}`);
+    }
+  }
+
+  /**
+   * Get check requests from Firebase filtered by location
+   */
+  static async getCheckRequests(location: string): Promise<CheckRequest[]> {
+    try {
+      const result = await invoke<CheckRequest[]>("get_check_requests", {
+        location,
+      });
+      console.log(
+        `🔍 Raw API Response - get_check_requests (location: ${location}):`,
+        result
+      );
+      console.log(`📊 Found ${result.length} check requests for ${location}`);
+      return result;
+    } catch (error) {
+      console.error("Error fetching check requests:", error);
+      throw new Error(`Failed to fetch check requests: ${error}`);
+    }
+  }
+
+  /**
+   * Update a check request status (complete or cancel)
+   */
+  static async updateCheckRequest(
+    documentId: string,
+    status: "completed" | "cancelled",
+    closingNotes: string
+  ): Promise<void> {
+    try {
+      console.log(
+        `🔄 Updating check request ${documentId} to status: ${status}`
+      );
+      await invoke("update_check_request", {
+        documentId,
+        status,
+        closingNotes,
+      });
+      console.log("✅ Check request updated successfully");
+    } catch (error) {
+      console.error("❌ Error updating check request:", error);
+      throw new Error(`Failed to update check request: ${error}`);
     }
   }
 }
