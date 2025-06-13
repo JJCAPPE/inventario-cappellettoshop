@@ -109,6 +109,7 @@ function App() {
   // Function to handle check requests panel toggle
   const handleCheckRequestsPanelToggle = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent event bubbling
+    e.preventDefault(); // Prevent default behavior
     console.log("🔄 Check requests panel toggle clicked:", { sidebarVisible });
 
     if (sidebarVisible && currentView === "checkRequests") {
@@ -143,7 +144,7 @@ function App() {
 
         // Also check if click is on the toggle button itself
         const isToggleButton = target.closest(
-          'button[title*="pannello modifiche"]'
+          'button[title*="pannello modifiche"], button[title*="pannello richieste"]'
         );
 
         if (!isAntdOverlay && !isToggleButton) {
