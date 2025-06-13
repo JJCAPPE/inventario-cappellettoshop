@@ -93,6 +93,7 @@ function App() {
   // Simplified toggle function
   const handleDataPanelToggle = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent event bubbling
+    e.preventDefault(); // Prevent default behavior
     console.log("🔄 Data panel toggle clicked:", { sidebarVisible });
 
     if (sidebarVisible && currentView === "data") {

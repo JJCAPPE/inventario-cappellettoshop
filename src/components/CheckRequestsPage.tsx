@@ -151,6 +151,12 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
 
   const handleRefresh = () => {
     console.log("🔄 CheckRequestsPage: Manual refresh button clicked");
+    // Reset all filters to default state
+    setSearchQuery("");
+    setPriorityFilter(undefined);
+    setStatusFilter("pending");
+    setDateRange(null);
+    // Then fetch fresh data
     fetchCheckRequests();
   };
 
@@ -270,7 +276,8 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
             <Search
               placeholder="Cerca controlli..."
               allowClear
-              onSearch={handleSearch}
+              onChange={(e) => handleSearch(e.target.value)}
+              value={searchQuery}
               prefix={<SearchOutlined />}
               disabled={loading}
             />
@@ -287,6 +294,12 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
               onChange={setPriorityFilter}
               style={{ width: "100%" }}
             >
+              <Option value={undefined}>
+                <Space>
+                  <span style={{ color: "#999" }}>●</span>
+                  Tutte
+                </Space>
+              </Option>
               <Option value="high">
                 <Space>
                   <span style={{ color: "#f5222d" }}>●</span>
@@ -315,6 +328,7 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
               onChange={setStatusFilter}
               style={{ width: "100%" }}
             >
+              <Option value={undefined}>Tutte</Option>
               <Option value="pending">In attesa</Option>
               <Option value="completed">Completato</Option>
               <Option value="cancelled">Annullato</Option>
@@ -414,7 +428,7 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
                         }}
                       />
                     )}
-                    <Text strong style={{ fontSize: 10 }}>
+                    <Text strong style={{ fontSize: 10, paddingTop: 8 }}>
                       ID: {request.product_id}
                     </Text>
                   </div>
