@@ -1,6 +1,6 @@
 {
     "$schema": "https://schema.tauri.app/config/2",
-    "productName": "inventario-cappellettoshop",
+    "productName": "Inventario CappellettoShop",
     "version": "3.0.0",
     "identifier": "com.cappellettoshop.inventario",
     "build": {

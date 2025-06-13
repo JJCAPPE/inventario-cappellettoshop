@@ -3,7 +3,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -91,6 +91,46 @@ pub struct DateRange {
     pub start_date: String,
     pub end_date: String,
     pub days_back: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CheckRequest {
+    pub check_all: bool,
+    pub checked: bool,
+    pub checked_at: Option<String>,
+    pub checked_by: Option<String>,
+    pub location: Vec<String>,
+    pub notes: String,
+    pub priority: String,
+    pub product_id: i64,
+    pub product_name: String,
+    pub requested_by: String,
+    pub status: String,
+    pub timestamp: String,
+    pub variant_id: Option<i64>,
+    pub variant_name: Option<String>,
+    pub image_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CheckRequestWithId {
+    pub id: String, // Document ID from Firebase
+    pub check_all: bool,
+    pub checked: bool,
+    pub checked_at: Option<String>,
+    pub checked_by: Option<String>,
+    pub location: Vec<String>,
+    pub notes: String,
+    pub priority: String,
+    pub product_id: i64,
+    pub product_name: String,
+    pub requested_by: String,
+    pub status: String,
+    pub timestamp: String,
+    pub variant_id: Option<i64>,
+    pub variant_name: Option<String>,
+    pub closing_notes: Option<String>,
+    pub image_url: Option<String>,
 }
 
 // ============================================================================
@@ -541,6 +581,143 @@ impl FirebaseClient {
         Ok(FirestoreDocument { fields })
     }
 
+    /// Convert CheckRequest to Firestore document format
+    fn check_request_to_firestore_doc(
+        &self,
+        check_request: &CheckRequest,
+    ) -> Result<FirestoreDocument, String> {
+        let mut fields = HashMap::new();
+
+        // Add all the fields from the CheckRequest struct
+        fields.insert(
+            "check_all".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.check_all.to_string(),
+            },
+        );
+
+        fields.insert(
+            "checked".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.checked.to_string(),
+            },
+        );
+
+        if let Some(checked_at) = &check_request.checked_at {
+            fields.insert(
+                "checked_at".to_string(),
+                FirestoreValue::StringValue {
+                    string_value: checked_at.clone(),
+                },
+            );
+        }
+
+        if let Some(checked_by) = &check_request.checked_by {
+            fields.insert(
+                "checked_by".to_string(),
+                FirestoreValue::StringValue {
+                    string_value: checked_by.clone(),
+                },
+            );
+        }
+
+        // Convert location array to Firestore array format
+        let location_values: Vec<FirestoreValue> = check_request
+            .location
+            .iter()
+            .map(|loc| FirestoreValue::StringValue {
+                string_value: loc.clone(),
+            })
+            .collect();
+
+        fields.insert(
+            "location".to_string(),
+            FirestoreValue::ArrayValue {
+                array_value: ArrayValues {
+                    values: location_values,
+                },
+            },
+        );
+
+        fields.insert(
+            "notes".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.notes.clone(),
+            },
+        );
+
+        fields.insert(
+            "priority".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.priority.clone(),
+            },
+        );
+
+        fields.insert(
+            "product_id".to_string(),
+            FirestoreValue::IntegerValue {
+                integer_value: check_request.product_id.to_string(),
+            },
+        );
+
+        fields.insert(
+            "product_name".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.product_name.clone(),
+            },
+        );
+
+        fields.insert(
+            "requested_by".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.requested_by.clone(),
+            },
+        );
+
+        fields.insert(
+            "status".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.status.clone(),
+            },
+        );
+
+        fields.insert(
+            "timestamp".to_string(),
+            FirestoreValue::StringValue {
+                string_value: check_request.timestamp.clone(),
+            },
+        );
+
+        if let Some(variant_id) = check_request.variant_id {
+            fields.insert(
+                "variant_id".to_string(),
+                FirestoreValue::IntegerValue {
+                    integer_value: variant_id.to_string(),
+                },
+            );
+        }
+
+        if let Some(variant_name) = &check_request.variant_name {
+            fields.insert(
+                "variant_name".to_string(),
+                FirestoreValue::StringValue {
+                    string_value: variant_name.clone(),
+                },
+            );
+        }
+
+        if let Some(image_url) = &check_request.image_url {
+            fields.insert(
+                "image_url".to_string(),
+                FirestoreValue::StringValue {
+                    string_value: image_url.clone(),
+                },
+            );
+        }
+
+        Ok(FirestoreDocument { fields })
+    }
+
     /// Parse Firestore runQuery response to LogEntry vector (for structured queries)
     fn parse_firestore_runquery_response(
         &self,
@@ -820,6 +997,349 @@ impl FirebaseClient {
             }
         }
     }
+
+    /// Create a check request document in Firestore
+    pub async fn create_check_request(
+        &self,
+        check_request: CheckRequest,
+    ) -> Result<StatusResponse, String> {
+        println!("🔥 Creating check request in Firebase...");
+        println!(
+            "   📋 Product: {} (ID: {})",
+            check_request.product_name, check_request.product_id
+        );
+        println!("   👤 Requested by: {}", check_request.requested_by);
+        println!("   📍 Locations: {:?}", check_request.location);
+
+        let collection_url = format!("{}/checks", self.firestore_url);
+        println!("   🌐 Firebase URL: {}", collection_url);
+
+        // Convert CheckRequest to Firestore document format
+        let firestore_doc = self.check_request_to_firestore_doc(&check_request)?;
+
+        let response = self
+            .client
+            .post(&collection_url)
+            .header("Content-Type", "application/json")
+            .query(&[("key", &self.config.firebase_api_key)])
+            .json(&firestore_doc)
+            .send()
+            .await
+            .map_err(|e| {
+                println!("❌ Firebase request failed: {}", e);
+                format!("Failed to send request to Firestore: {}", e)
+            })?;
+
+        println!("   📡 Firebase response status: {}", response.status());
+
+        if response.status().is_success() {
+            // Parse the response to get the document ID
+            let response_data: serde_json::Value = response
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse Firestore response: {}", e))?;
+
+            // Extract document ID from the response
+            let document_id = if let Some(name) = response_data["name"].as_str() {
+                // Extract ID from path like "projects/PROJECT_ID/databases/(default)/documents/checks/DOCUMENT_ID"
+                name.split('/').last().unwrap_or("unknown").to_string()
+            } else {
+                "unknown".to_string()
+            };
+
+            println!("✅ Check request created successfully!");
+            println!("   📄 Document ID: {}", document_id);
+
+            Ok(StatusResponse {
+                status: "success".to_string(),
+                message: format!(
+                    "Check request created successfully with ID: {}",
+                    document_id
+                ),
+            })
+        } else {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            println!("❌ Firebase error: {}", error_text);
+            Err(format!("Firestore error: {}", error_text))
+        }
+    }
+
+    /// Get check requests from Firestore filtered by location
+    pub async fn get_check_requests(
+        &self,
+        location: String,
+    ) -> Result<Vec<CheckRequestWithId>, String> {
+        println!(
+            "🔥 Getting check requests from Firebase for location: {}",
+            location
+        );
+
+        let query_url = format!("{}:runQuery", self.firestore_url);
+        println!("   🌐 Firebase URL: {}", query_url);
+
+        // Create a structured query to filter by location
+        let query = json!({
+            "structuredQuery": {
+                "from": [{
+                    "collectionId": "checks"
+                }],
+                "where": {
+                    "fieldFilter": {
+                        "field": {
+                            "fieldPath": "location"
+                        },
+                        "op": "ARRAY_CONTAINS",
+                        "value": {
+                            "stringValue": location
+                        }
+                    }
+                },
+                "orderBy": [{
+                    "field": {
+                        "fieldPath": "timestamp"
+                    },
+                    "direction": "DESCENDING"
+                }]
+            }
+        });
+
+        let response = self
+            .client
+            .post(&query_url)
+            .header("Content-Type", "application/json")
+            .query(&[("key", &self.config.firebase_api_key)])
+            .json(&query)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to send request to Firestore: {}", e))?;
+
+        println!("   📡 Firebase response status: {}", response.status());
+
+        if response.status().is_success() {
+            let response_data: serde_json::Value = response
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse Firestore response: {}", e))?;
+
+            let check_requests = self.parse_firestore_check_requests_response(response_data)?;
+
+            println!(
+                "✅ Found {} check requests for location {}",
+                check_requests.len(),
+                location
+            );
+
+            Ok(check_requests)
+        } else {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            println!("❌ Firebase error response: {}", error_text);
+            Err(format!("Failed to get check requests: {}", error_text))
+        }
+    }
+
+    /// Update a check request status and add closing notes
+    pub async fn update_check_request(
+        &self,
+        document_id: String,
+        status: String,
+        closing_notes: String,
+    ) -> Result<StatusResponse, String> {
+        println!(
+            "🔥 Updating check request {} to status: {}",
+            document_id, status
+        );
+
+        let document_url = format!("{}/checks/{}", self.firestore_url, document_id);
+        println!("   🌐 Firebase URL: {}", document_url);
+
+        // Create update document with status and closing_notes fields
+        let update_doc = json!({
+            "fields": {
+                "status": {
+                    "stringValue": status
+                },
+                "closing_notes": {
+                    "stringValue": closing_notes
+                },
+                "checked": {
+                    "booleanValue": status == "completed"
+                },
+                "checked_at": {
+                    "stringValue": Utc::now().to_rfc3339()
+                }
+            }
+        });
+
+        let response = self
+            .client
+            .patch(&document_url)
+            .header("Content-Type", "application/json")
+            .query(&[
+                ("key", &self.config.firebase_api_key),
+                ("updateMask.fieldPaths", &"status".to_string()),
+                ("updateMask.fieldPaths", &"closing_notes".to_string()),
+                ("updateMask.fieldPaths", &"checked".to_string()),
+                ("updateMask.fieldPaths", &"checked_at".to_string()),
+            ])
+            .json(&update_doc)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to send request to Firestore: {}", e))?;
+
+        println!("   📡 Firebase response status: {}", response.status());
+
+        if response.status().is_success() {
+            println!("✅ Check request updated successfully!");
+
+            Ok(StatusResponse {
+                status: "success".to_string(),
+                message: format!("Check request {} updated to {}", document_id, status),
+            })
+        } else {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            println!("❌ Firebase error: {}", error_text);
+            Err(format!("Firestore error: {}", error_text))
+        }
+    }
+
+    /// Parse check requests from Firestore runQuery response
+    fn parse_firestore_check_requests_response(
+        &self,
+        response: serde_json::Value,
+    ) -> Result<Vec<CheckRequestWithId>, String> {
+        let mut check_requests = Vec::new();
+
+        if let Some(documents) = response.as_array() {
+            for document_result in documents {
+                if let Some(document) = document_result.get("document") {
+                    match self.parse_firestore_check_request_document(document) {
+                        Ok(check_request) => check_requests.push(check_request),
+                        Err(e) => {
+                            println!("⚠️ Skipping invalid check request document: {}", e);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(check_requests)
+    }
+
+    /// Parse a single check request document from Firestore
+    fn parse_firestore_check_request_document(
+        &self,
+        doc: &serde_json::Value,
+    ) -> Result<CheckRequestWithId, String> {
+        let fields = doc["fields"].as_object().ok_or("Document missing fields")?;
+
+        // Extract document ID from name path
+        let document_id = if let Some(name) = doc["name"].as_str() {
+            name.split('/').last().unwrap_or("unknown").to_string()
+        } else {
+            "unknown".to_string()
+        };
+
+        // Helper function to extract string value
+        let get_string_field = |field_name: &str| -> Result<String, String> {
+            fields
+                .get(field_name)
+                .and_then(|f| f.get("stringValue"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .ok_or_else(|| format!("Missing or invalid {} field", field_name))
+        };
+
+        // Helper function to extract optional string value
+        let get_optional_string_field = |field_name: &str| -> Option<String> {
+            fields
+                .get(field_name)
+                .and_then(|f| f.get("stringValue"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        };
+
+        // Helper function to extract integer value
+        let get_integer_field = |field_name: &str| -> Result<i64, String> {
+            fields
+                .get(field_name)
+                .and_then(|f| f.get("integerValue"))
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<i64>().ok())
+                .ok_or_else(|| format!("Missing or invalid {} field", field_name))
+        };
+
+        // Helper function to extract optional integer value
+        let get_optional_integer_field = |field_name: &str| -> Option<i64> {
+            fields
+                .get(field_name)
+                .and_then(|f| f.get("integerValue"))
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<i64>().ok())
+        };
+
+        // Helper function to extract boolean value
+        let get_boolean_field = |field_name: &str| -> bool {
+            fields
+                .get(field_name)
+                .and_then(|f| f.get("booleanValue"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        };
+
+        // Helper function to extract array of strings (for location)
+        let get_string_array_field = |field_name: &str| -> Result<Vec<String>, String> {
+            let array_value = fields
+                .get(field_name)
+                .and_then(|f| f.get("arrayValue"))
+                .and_then(|av| av.get("values"))
+                .and_then(|v| v.as_array())
+                .ok_or_else(|| format!("Missing or invalid {} array field", field_name))?;
+
+            let mut result = Vec::new();
+            for value in array_value {
+                if let Some(string_val) = value.get("stringValue").and_then(|v| v.as_str()) {
+                    result.push(string_val.to_string());
+                }
+            }
+
+            if result.is_empty() {
+                return Err(format!("{} array is empty", field_name));
+            }
+
+            Ok(result)
+        };
+
+        let check_request = CheckRequestWithId {
+            id: document_id,
+            check_all: get_boolean_field("check_all"),
+            checked: get_boolean_field("checked"),
+            checked_at: get_optional_string_field("checked_at"),
+            checked_by: get_optional_string_field("checked_by"),
+            location: get_string_array_field("location")?,
+            notes: get_string_field("notes").unwrap_or_default(),
+            priority: get_string_field("priority")?,
+            product_id: get_integer_field("product_id")?,
+            product_name: get_string_field("product_name")?,
+            requested_by: get_string_field("requested_by")?,
+            status: get_string_field("status")?,
+            timestamp: get_string_field("timestamp")?,
+            variant_id: get_optional_integer_field("variant_id"),
+            variant_name: get_optional_string_field("variant_name"),
+            closing_notes: get_optional_string_field("closing_notes"),
+            image_url: get_optional_string_field("image_url"),
+        };
+
+        Ok(check_request)
+    }
 }
 
 // ============================================================================
@@ -885,6 +1405,37 @@ pub async fn get_logs_by_product_id(
     let firebase_client = FirebaseClient::new(config.inner().clone());
     firebase_client
         .get_logs_by_product_id(product_id, location, start_date, end_date)
+        .await
+}
+
+#[tauri::command]
+pub async fn create_check_request(
+    check_request: CheckRequest,
+    config: tauri::State<'_, AppConfig>,
+) -> Result<StatusResponse, String> {
+    let firebase_client = FirebaseClient::new(config.inner().clone());
+    firebase_client.create_check_request(check_request).await
+}
+
+#[tauri::command]
+pub async fn get_check_requests(
+    location: String,
+    config: tauri::State<'_, AppConfig>,
+) -> Result<Vec<CheckRequestWithId>, String> {
+    let firebase_client = FirebaseClient::new(config.inner().clone());
+    firebase_client.get_check_requests(location).await
+}
+
+#[tauri::command]
+pub async fn update_check_request(
+    document_id: String,
+    status: String,
+    closing_notes: String,
+    config: tauri::State<'_, AppConfig>,
+) -> Result<StatusResponse, String> {
+    let firebase_client = FirebaseClient::new(config.inner().clone());
+    firebase_client
+        .update_check_request(document_id, status, closing_notes)
         .await
 }
 

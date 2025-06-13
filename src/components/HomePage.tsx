@@ -26,6 +26,7 @@ import {
   SettingOutlined,
   GlobalOutlined,
   HistoryOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import SearchBar from "./SearchBar";
@@ -33,6 +34,7 @@ import { ProductDetails, SecondaryDetails } from "../types/index";
 import { useLogs } from "../contexts/LogContext";
 import TauriAPI from "../services/tauri";
 import ModificationHistoryModal from "./ModificationHistoryModal";
+import CheckRequestModal from "./CheckRequestModal";
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -64,6 +66,8 @@ const HomePage: React.FC<HomePageProps> = ({
   const [undoModalVisible, setUndoModalVisible] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [modificationHistoryModalVisible, setModificationHistoryModalVisible] =
+    useState(false);
+  const [checkRequestModalVisible, setCheckRequestModalVisible] =
     useState(false);
   const [searchSortKey, setSearchSortKey] = useState<string>("RELEVANCE");
   const [searchSortReverse, setSearchSortReverse] = useState<boolean>(false);
@@ -267,6 +271,7 @@ const HomePage: React.FC<HomePageProps> = ({
         descrizioneArticolo: product.description || "",
         immaginiArticolo: product.images || [],
         varaintiArticolo: updatedVariants.map((variant) => ({
+          variant_id: variant.variant_id,
           inventory_item_id: variant.inventory_item_id,
           title: variant.title,
           inventory_quantity: variant.inventory_quantity,
@@ -285,6 +290,7 @@ const HomePage: React.FC<HomePageProps> = ({
             secondary: 0,
           };
           return {
+            variant_id: variant.variant_id,
             inventory_item_id: variant.inventory_item_id,
             title: variant.title,
             inventory_quantity: inventoryData.secondary, // Use secondary location inventory
@@ -327,22 +333,29 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleVariantSelect = (variant: string) => {
-    // Find the variant object to check inventory
-    const variantObj = productDetails?.varaintiArticolo.find(
-      (v) => v.title === variant
-    );
-
-    // Don't allow selection if variant has zero inventory
-    if (!variantObj || variantObj.inventory_quantity === 0) {
-      message.warning(`La taglia ${variant} non è disponibile (quantità: 0)`);
-      return;
-    }
-
+    // Always allow selection, even if variant has zero inventory
     setSelectedVariant(variant);
   };
 
   const handleDecreaseInventory = () => {
     if (!selectedVariant || !productDetails) return;
+
+    // Check if the selected variant has 0 inventory
+    const variant = productDetails.varaintiArticolo.find(
+      (v) => v.title === selectedVariant
+    );
+
+    if (!variant) {
+      message.error("Variante non trovata");
+      return;
+    }
+
+    if (variant.inventory_quantity === 0) {
+      message.warning(
+        `La taglia ${selectedVariant} ha già quantità 0. Non è possibile ridurla ulteriormente.`
+      );
+      return;
+    }
 
     Modal.confirm({
       title: "Conferma Modifica",
@@ -559,6 +572,16 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
+  const handleCreateCheckRequest = () => {
+    if (productDetails) {
+      setCheckRequestModalVisible(true);
+    } else {
+      message.warning(
+        "Seleziona prima un prodotto per creare una richiesta di controllo"
+      );
+    }
+  };
+
   const handleReset = () => {
     setQuery("");
     setProductDetails(null);
@@ -571,14 +594,11 @@ const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div style={{ padding: 24 }}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-        <Col>
+      <Row gutter={24} style={{ marginBottom: 24 }} align="middle">
+        <Col span={3}>
           <Badge count={version} color="#FFF2E3" style={{ color: "#492513" }} />
         </Col>
-      </Row>
-
-      <Row gutter={24} style={{ marginBottom: 24 }}>
-        <Col span={18} offset={3}>
+        <Col span={18}>
           <Space direction="vertical" style={{ width: "100%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div style={{ flex: 1 }}>
@@ -608,6 +628,7 @@ const HomePage: React.FC<HomePageProps> = ({
             </div>
           </Space>
         </Col>
+        <Col span={3}></Col>
       </Row>
 
       <Divider />
@@ -678,7 +699,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   return (
                     <List.Item
                       style={{
-                        cursor: isOutOfStock ? "not-allowed" : "pointer",
+                        cursor: "pointer",
                         backgroundColor: isSelected
                           ? "#e6f7ff"
                           : isOutOfStock
@@ -830,33 +851,54 @@ const HomePage: React.FC<HomePageProps> = ({
               </Panel>
             </Collapse>
 
-            <Space direction="horizontal" style={{ width: "100%" }}>
-              <Button
-                type="default"
-                icon={<ShopOutlined />}
-                onClick={handleViewOnShopify}
-                size="large"
-              >
-                Visualizza su Shopify
-              </Button>
-              <Button
-                type="primary"
-                icon={<GlobalOutlined />}
-                onClick={handleViewOnShop}
-                size="large"
-              >
-                Visualizza su Shop
-              </Button>
-              <Button
-                type="default"
-                icon={<HistoryOutlined />}
-                onClick={handleViewModificationHistory}
-                size="large"
-                disabled={!productDetails}
-              >
-                Cronologia Modifiche
-              </Button>
-            </Space>
+            <Row gutter={[16, 16]} justify="center">
+              <Col xs={24} sm={12} lg={8}>
+                <Button
+                  type="primary"
+                  icon={<ShopOutlined />}
+                  onClick={handleViewOnShopify}
+                  size="large"
+                  block
+                >
+                  Shopify
+                </Button>
+              </Col>
+              <Col xs={24} sm={12} lg={8}>
+                <Button
+                  type="primary"
+                  icon={<GlobalOutlined />}
+                  onClick={handleViewOnShop}
+                  size="large"
+                  block
+                >
+                  Sito
+                </Button>
+              </Col>
+              <Col xs={24} sm={12} lg={8}>
+                <Button
+                  type="default"
+                  icon={<HistoryOutlined />}
+                  onClick={handleViewModificationHistory}
+                  size="large"
+                  disabled={!productDetails}
+                  block
+                >
+                  Cronologia
+                </Button>
+              </Col>
+              <Col xs={24} sm={12} lg={8}>
+                <Button
+                  type="default"
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleCreateCheckRequest}
+                  size="large"
+                  disabled={!productDetails}
+                  block
+                >
+                  Richiesta Controllo
+                </Button>
+              </Col>
+            </Row>
           </Col>
         </Row>
       )}
@@ -915,6 +957,17 @@ const HomePage: React.FC<HomePageProps> = ({
           onClose={() => setModificationHistoryModalVisible(false)}
           productId={productDetails.id}
           productName={productDetails.nomeArticolo}
+          primaryLocation={primaryLocation}
+        />
+      )}
+
+      {/* Check Request Modal */}
+      {productDetails && (
+        <CheckRequestModal
+          visible={checkRequestModalVisible}
+          onClose={() => setCheckRequestModalVisible(false)}
+          productDetails={productDetails}
+          selectedVariant={selectedVariant}
           primaryLocation={primaryLocation}
         />
       )}

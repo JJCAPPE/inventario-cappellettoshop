@@ -51,6 +51,9 @@ fn main() {
             firebase::get_logs,
             firebase::get_logs_date_range,
             firebase::get_logs_by_product_id,
+            firebase::create_check_request,
+            firebase::get_check_requests,
+            firebase::update_check_request,
             firebase::get_firebase_config,
             // Location commands
             location::get_app_location,
