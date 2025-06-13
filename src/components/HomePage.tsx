@@ -39,8 +39,6 @@ import CheckRequestModal from "./CheckRequestModal";
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
 
-const version = import.meta.env.VITE_VERSION || "3.0.0";
-
 interface HomePageProps {
   targetProductId?: string | null;
   onTargetProductProcessed?: () => void;
@@ -595,10 +593,7 @@ const HomePage: React.FC<HomePageProps> = ({
   return (
     <div style={{ padding: 24 }}>
       <Row gutter={24} style={{ marginBottom: 24 }} align="middle">
-        <Col span={3}>
-          <Badge count={version} color="#FFF2E3" style={{ color: "#492513" }} />
-        </Col>
-        <Col span={18}>
+        <Col span={21}>
           <Space direction="vertical" style={{ width: "100%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div style={{ flex: 1 }}>

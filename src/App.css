@@ -15,6 +15,35 @@
 }
 
 
+/* Title bar integration styles */
+
+.app-header {
+    background-color: #492513 !important;
+    /* Add padding for macOS traffic lights when using overlay style */
+    padding-left: 80px !important;
+}
+
+
+/* Windows-specific padding adjustment */
+
+@media screen and (max-width: 0) {
+    /* This will never match, but we can override in JS */
+}
+
+
+/* Make the app header blend with title bar */
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #492513;
+}
+
+#root {
+    background-color: #fff2e3;
+}
+
+
 /* Apply custom colors to Ant Design components */
 
 .ant-btn-primary {

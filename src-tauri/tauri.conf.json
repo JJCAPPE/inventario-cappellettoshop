@@ -13,7 +13,9 @@
         "windows": [{
             "title": "Inventario CappellettoShop",
             "width": 2000,
-            "height": 1000
+            "height": 1000,
+            "titleBarStyle": "Overlay",
+            "theme": "Dark"
         }],
         "security": {
             "csp": null

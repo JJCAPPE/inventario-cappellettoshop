@@ -212,58 +212,20 @@ function App() {
       <ConfigProvider theme={customTheme}>
         <Layout style={{ minHeight: "100vh" }}>
           <Header
+            className="app-header"
             style={{
               position: "fixed",
               zIndex: 1,
               width: "100%",
               background: "#492513",
               padding: "0 16px",
+              paddingLeft: navigator.platform.includes("Mac") ? "80px" : "16px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
             }}
           >
-            <div
-              style={{ color: "white", fontSize: "24px", fontWeight: "bold" }}
-            >
-              Inventario CappellettoShop
-            </div>
-
-            <div style={{ display: "flex", gap: "8px" }}>
-              <Button
-                className={
-                  sidebarVisible && currentView === "data"
-                    ? "modifiche-button-active"
-                    : ""
-                }
-                icon={<DatabaseOutlined />}
-                onClick={handleDataPanelToggle}
-                style={{
-                  background:
-                    sidebarVisible && currentView === "data"
-                      ? "#FFE8D1"
-                      : "transparent",
-                  borderColor:
-                    sidebarVisible && currentView === "data"
-                      ? "#FFE8D1"
-                      : "#d9d9d9",
-                  color:
-                    sidebarVisible && currentView === "data"
-                      ? "#492513"
-                      : "#d9d9d9",
-                  transition: "all 0.2s ease",
-                }}
-                title={
-                  sidebarVisible && currentView === "data"
-                    ? "Chiudi pannello modifiche"
-                    : "Apri pannello modifiche"
-                }
-              >
-                {sidebarVisible && currentView === "data"
-                  ? "Chiudi Modifiche"
-                  : "Modifiche"}
-              </Button>
-
+            <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
               <Button
                 className={
                   sidebarVisible && currentView === "checkRequests"
@@ -297,15 +259,67 @@ function App() {
                   ? "Chiudi Richieste"
                   : "Richieste"}
               </Button>
+              <Button
+                className={
+                  sidebarVisible && currentView === "data"
+                    ? "modifiche-button-active"
+                    : ""
+                }
+                icon={<DatabaseOutlined />}
+                onClick={handleDataPanelToggle}
+                style={{
+                  background:
+                    sidebarVisible && currentView === "data"
+                      ? "#FFE8D1"
+                      : "transparent",
+                  borderColor:
+                    sidebarVisible && currentView === "data"
+                      ? "#FFE8D1"
+                      : "#d9d9d9",
+                  color:
+                    sidebarVisible && currentView === "data"
+                      ? "#492513"
+                      : "#d9d9d9",
+                  transition: "all 0.2s ease",
+                }}
+                title={
+                  sidebarVisible && currentView === "data"
+                    ? "Chiudi pannello modifiche"
+                    : "Apri pannello modifiche"
+                }
+              >
+                {sidebarVisible && currentView === "data"
+                  ? "Chiudi Modifiche"
+                  : "Modifiche"}
+              </Button>
             </div>
           </Header>
 
           <Layout style={{ marginTop: 64 }}>
-            <Content style={{ position: "relative" }}>
+            <Content
+              style={{ position: "relative", minHeight: "calc(100vh - 64px)" }}
+            >
               <HomePage
                 targetProductId={targetProductId}
                 onTargetProductProcessed={() => setTargetProductId(null)}
               />
+
+              {/* Discrete version indicator at bottom center */}
+              <div
+                style={{
+                  position: "fixed",
+                  bottom: "8px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  fontSize: "10px",
+                  color: "#999",
+                  zIndex: 1,
+                  userSelect: "none",
+                  pointerEvents: "none",
+                }}
+              >
+                v3.0.0
+              </div>
             </Content>
 
             {/* Sidebar Drawer for mobile/tablet */}
