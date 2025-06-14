@@ -27,6 +27,8 @@ import {
   GlobalOutlined,
   HistoryOutlined,
   CheckCircleOutlined,
+  RightOutlined,
+  LeftOutlined,
 } from "@ant-design/icons";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import SearchBar from "./SearchBar";
@@ -74,6 +76,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastModifiedVariant, setLastModifiedVariant] = useState<string | null>(
     null
   );
+  const [secondaryPanelExpanded, setSecondaryPanelExpanded] = useState(false);
 
   // Legacy variables for backward compatibility
   const negozio = primaryLocation;
@@ -719,114 +722,42 @@ const HomePage: React.FC<HomePageProps> = ({
           </Col>
 
           <Col span={12}>
-            <Card title={`Varianti ${negozio}`} style={{ marginBottom: 16 }}>
-              <List
-                dataSource={productDetails.varaintiArticolo}
-                renderItem={(variant) => {
-                  const isOutOfStock = variant.inventory_quantity === 0;
-                  const isSelected = selectedVariant === variant.title;
-
-                  return (
-                    <List.Item
-                      style={{
-                        cursor: "pointer",
-                        backgroundColor: isSelected
-                          ? "#e6f7ff"
-                          : isOutOfStock
-                          ? "#f5f5f5"
-                          : "transparent",
-                        padding: "8px 12px",
-                        border: isSelected
-                          ? "1px solid #1890ff"
-                          : "1px solid transparent",
-                        borderRadius: "8px",
-                        marginBottom: "2px",
-                        opacity: isOutOfStock ? 0.6 : 1,
-                      }}
-                      onClick={() => handleVariantSelect(variant.title)}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          width: "100%",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center" }}>
-                          <Text
-                            style={{
-                              color: isOutOfStock ? "#999" : "inherit",
-                              textDecoration: isOutOfStock
-                                ? "line-through"
-                                : "none",
-                            }}
-                          >
-                            {variant.title}
-                          </Text>
-                          {isOutOfStock && (
-                            <Text
-                              style={{
-                                color: "#f5222d",
-                                fontSize: "12px",
-                                marginLeft: 8,
-                              }}
-                            >
-                              (Esaurito)
-                            </Text>
-                          )}
-                        </div>
-                        <Badge
-                          count={variant.inventory_quantity}
-                          style={{
-                            backgroundColor:
-                              variant.inventory_quantity > 0
-                                ? "#52c41a"
-                                : "#f5222d",
-                          }}
-                        />
-                      </div>
-                    </List.Item>
-                  );
-                }}
-              />
-
-              {selectedVariant && (
-                <div style={{ marginTop: 16 }}>
-                  <Button
-                    type="primary"
-                    danger
-                    size="large"
-                    onClick={handleDecreaseInventory}
-                    loading={isModifyLoading}
-                    block
-                  >
-                    Modifica Variante
-                  </Button>
-                </div>
-              )}
-            </Card>
-
-            <Collapse style={{ marginBottom: 16 }}>
-              <Panel header={`Varianti ${secondario}`} key="1">
-                {secondaryProductDetails &&
-                secondaryProductDetails.availableVariants.length > 0 ? (
+            {/* Variants Layout - Side by Side */}
+            <Row gutter={8} style={{ marginBottom: 16 }}>
+              {/* Primary Location Variants */}
+              <Col span={secondaryPanelExpanded ? 12 : 16}>
+                <Card
+                  title={`Varianti ${negozio}`}
+                  size="small"
+                  style={{ height: "auto" }}
+                >
                   <List
-                    dataSource={secondaryProductDetails.availableVariants}
+                    size="small"
+                    dataSource={productDetails.varaintiArticolo}
                     renderItem={(variant) => {
                       const isOutOfStock = variant.inventory_quantity === 0;
+                      const isSelected = selectedVariant === variant.title;
 
                       return (
                         <List.Item
                           style={{
-                            backgroundColor: isOutOfStock
+                            cursor: "pointer",
+                            backgroundColor: isSelected
+                              ? "#e6f7ff"
+                              : isOutOfStock
                               ? "#f5f5f5"
                               : "transparent",
-                            padding: "8px 12px",
-                            border: "1px solid transparent",
+                            padding: secondaryPanelExpanded
+                              ? "6px 4px"
+                              : "6px 8px",
+                            border: isSelected
+                              ? "1px solid #1890ff"
+                              : "1px solid transparent",
                             borderRadius: "8px",
                             marginBottom: "2px",
                             opacity: isOutOfStock ? 0.6 : 1,
                           }}
+                          onClick={() => handleVariantSelect(variant.title)}
                         >
                           <div
                             style={{
@@ -844,6 +775,7 @@ const HomePage: React.FC<HomePageProps> = ({
                                   textDecoration: isOutOfStock
                                     ? "line-through"
                                     : "none",
+                                  fontSize: "14px",
                                 }}
                               >
                                 {variant.title}
@@ -852,8 +784,8 @@ const HomePage: React.FC<HomePageProps> = ({
                                 <Text
                                   style={{
                                     color: "#f5222d",
-                                    fontSize: "12px",
-                                    marginLeft: 8,
+                                    fontSize: "10px",
+                                    marginLeft: 4,
                                   }}
                                 >
                                   (Esaurito)
@@ -868,19 +800,228 @@ const HomePage: React.FC<HomePageProps> = ({
                                     ? "#52c41a"
                                     : "#f5222d",
                               }}
+                              size="small"
                             />
                           </div>
                         </List.Item>
                       );
                     }}
                   />
-                ) : (
-                  <Text strong>
-                    Nessuna variante disponibile a {secondario.toLowerCase()}
-                  </Text>
-                )}
-              </Panel>
-            </Collapse>
+
+                  {selectedVariant && (
+                    <div style={{ marginTop: 12 }}>
+                      <Button
+                        type="primary"
+                        danger
+                        size="large"
+                        onClick={handleDecreaseInventory}
+                        loading={isModifyLoading}
+                        block
+                      >
+                        Modifica Variante
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              </Col>
+
+              {/* Secondary Location Variants */}
+              <Col span={secondaryPanelExpanded ? 12 : 8}>
+                <Card
+                  size="small"
+                  style={{ height: "auto" }}
+                  title={
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        cursor: "pointer",
+                      }}
+                      onClick={() =>
+                        setSecondaryPanelExpanded(!secondaryPanelExpanded)
+                      }
+                    >
+                      <span>{secondario}</span>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={
+                          secondaryPanelExpanded ? (
+                            <LeftOutlined />
+                          ) : (
+                            <RightOutlined />
+                          )
+                        }
+                      />
+                    </div>
+                  }
+                >
+                  {secondaryPanelExpanded ? (
+                    // Expanded view - full list
+                    secondaryProductDetails &&
+                    secondaryProductDetails.availableVariants.length > 0 ? (
+                      <List
+                        size="small"
+                        dataSource={secondaryProductDetails.availableVariants}
+                        renderItem={(variant) => {
+                          const isOutOfStock = variant.inventory_quantity === 0;
+
+                          return (
+                            <List.Item
+                              style={{
+                                backgroundColor: isOutOfStock
+                                  ? "#f5f5f5"
+                                  : "transparent",
+                                padding: "6px 8px",
+                                border: "1px solid transparent",
+                                borderRadius: "8px",
+                                marginBottom: "2px",
+                                opacity: isOutOfStock ? 0.6 : 1,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  width: "100%",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: isOutOfStock ? "#999" : "inherit",
+                                      textDecoration: isOutOfStock
+                                        ? "line-through"
+                                        : "none",
+                                      fontSize: "12px",
+                                    }}
+                                  >
+                                    {variant.title}
+                                  </Text>
+                                  {isOutOfStock && (
+                                    <Text
+                                      style={{
+                                        color: "#f5222d",
+                                        fontSize: "10px",
+                                        marginLeft: 4,
+                                      }}
+                                    >
+                                      (Esaurito)
+                                    </Text>
+                                  )}
+                                </div>
+                                <Badge
+                                  count={variant.inventory_quantity}
+                                  style={{
+                                    backgroundColor:
+                                      variant.inventory_quantity > 0
+                                        ? "#52c41a"
+                                        : "#f5222d",
+                                  }}
+                                  size="small"
+                                />
+                              </div>
+                            </List.Item>
+                          );
+                        }}
+                      />
+                    ) : (
+                      <Text style={{ fontSize: "12px" }}>
+                        Nessuna variante a {secondario.toLowerCase()}
+                      </Text>
+                    )
+                  ) : (
+                    // Collapsed view - quantities aligned with primary variants
+                    <div>
+                      {secondaryProductDetails &&
+                      secondaryProductDetails.availableVariants.length > 0 ? (
+                        <List
+                          size="small"
+                          dataSource={productDetails.varaintiArticolo}
+                          renderItem={(primaryVariant) => {
+                            // Find matching variant in secondary location
+                            const secondaryVariant =
+                              secondaryProductDetails.availableVariants.find(
+                                (sv) => sv.title === primaryVariant.title
+                              );
+
+                            return (
+                              <List.Item
+                                style={{
+                                  padding: "6px 8px",
+                                  borderRadius: "8px",
+                                  marginBottom: "2px",
+                                  backgroundColor: "transparent",
+                                  display: "flex",
+                                  justifyContent: "center",
+                                  alignItems: "center",
+                                  minHeight: "32px", // Match the height of primary items
+                                }}
+                              >
+                                {secondaryVariant ? (
+                                  <Badge
+                                    count={secondaryVariant.inventory_quantity}
+                                    style={{
+                                      backgroundColor:
+                                        secondaryVariant.inventory_quantity > 0
+                                          ? "#52c41a"
+                                          : "#f5222d",
+                                    }}
+                                    size="small"
+                                  />
+                                ) : (
+                                  <div
+                                    style={{
+                                      width: "16px",
+                                      height: "16px",
+                                      borderRadius: "50%",
+                                      backgroundColor: "#d9d9d9",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    <Text
+                                      style={{ fontSize: "8px", color: "#999" }}
+                                    >
+                                      -
+                                    </Text>
+                                  </div>
+                                )}
+                              </List.Item>
+                            );
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: "100%",
+                            padding: "16px 0",
+                          }}
+                        >
+                          <Text
+                            style={{ fontSize: "12px", textAlign: "center" }}
+                          >
+                            Nessuna
+                            <br />
+                            variante
+                          </Text>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              </Col>
+            </Row>
 
             <Row gutter={[16, 16]} justify="center">
               <Col xs={24} sm={12} lg={8}>
