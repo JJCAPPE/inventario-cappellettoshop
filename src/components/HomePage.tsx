@@ -69,6 +69,11 @@ const HomePage: React.FC<HomePageProps> = ({
     useState(false);
   const [searchSortKey, setSearchSortKey] = useState<string>("RELEVANCE");
   const [searchSortReverse, setSearchSortReverse] = useState<boolean>(false);
+  const [isModifyLoading, setIsModifyLoading] = useState(false);
+  const [isUndoLoading, setIsUndoLoading] = useState(false);
+  const [lastModifiedVariant, setLastModifiedVariant] = useState<string | null>(
+    null
+  );
 
   // Legacy variables for backward compatibility
   const negozio = primaryLocation;
@@ -362,6 +367,7 @@ const HomePage: React.FC<HomePageProps> = ({
       okText: "Conferma",
       cancelText: "Annulla",
       onOk: async () => {
+        setIsModifyLoading(true);
         try {
           // Get the variant details
           const variant = productDetails.varaintiArticolo.find(
@@ -435,6 +441,9 @@ const HomePage: React.FC<HomePageProps> = ({
             lastSelectedQuery || productDetails.nomeArticolo
           );
 
+          // Store the modified variant for undo operation
+          setLastModifiedVariant(selectedVariant);
+
           // Show success modal
           setModifyModalVisible(true);
           message.success(
@@ -447,25 +456,42 @@ const HomePage: React.FC<HomePageProps> = ({
               error instanceof Error ? error.message : "Errore sconosciuto"
             }`
           );
+        } finally {
+          setIsModifyLoading(false);
         }
       },
     });
   };
 
   const handleUndoChange = async () => {
-    if (!selectedVariant || !productDetails) return;
+    console.log("🔄 handleUndoChange called", {
+      selectedVariant,
+      lastModifiedVariant,
+      productDetails: !!productDetails,
+    });
+    if (!lastModifiedVariant || !productDetails) {
+      console.log(
+        "❌ Missing lastModifiedVariant or productDetails, returning early"
+      );
+      return;
+    }
 
+    console.log("⏳ Setting undo loading to true");
+    setIsUndoLoading(true);
     try {
       // Get the variant details
       const variant = productDetails.varaintiArticolo.find(
-        (v) => v.title === selectedVariant
+        (v) => v.title === lastModifiedVariant
       );
 
       if (!variant) {
         throw new Error("Variante non trovata");
       }
 
-      console.log("🔄 Starting inventory undo for variant:", selectedVariant);
+      console.log(
+        "🔄 Starting inventory undo for variant:",
+        lastModifiedVariant
+      );
       console.log("📦 Inventory item ID:", variant.inventory_item_id);
       console.log("🏪 Primary location:", primaryLocation);
 
@@ -486,7 +512,7 @@ const HomePage: React.FC<HomePageProps> = ({
         variant.inventory_item_id,
         locationId,
         productDetails.id,
-        selectedVariant,
+        lastModifiedVariant,
         productDetails.nomeArticolo,
         productDetails.prezzo,
         primaryLocation,
@@ -523,7 +549,7 @@ const HomePage: React.FC<HomePageProps> = ({
       // Show success modal
       setUndoModalVisible(true);
       message.success(
-        `Annullamento completato con successo per ${selectedVariant}`
+        `Annullamento completato con successo per ${lastModifiedVariant}`
       );
     } catch (error) {
       console.error("❌ Error undoing change:", error);
@@ -532,6 +558,9 @@ const HomePage: React.FC<HomePageProps> = ({
           error instanceof Error ? error.message : "Errore sconosciuto"
         }`
       );
+    } finally {
+      console.log("✅ Setting undo loading to false");
+      setIsUndoLoading(false);
     }
   };
 
@@ -588,12 +617,18 @@ const HomePage: React.FC<HomePageProps> = ({
     setLastSelectedQuery("");
     setModifyModalVisible(false);
     setUndoModalVisible(false);
+    // Reset loading states
+    setIsModifyLoading(false);
+    setIsUndoLoading(false);
+    // Clear last modified variant
+    setLastModifiedVariant(null);
   };
 
   return (
     <div style={{ padding: 24 }}>
       <Row gutter={24} style={{ marginBottom: 24 }} align="middle">
-        <Col span={21}>
+        <Col span={4}></Col>
+        <Col span={16}>
           <Space direction="vertical" style={{ width: "100%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <div style={{ flex: 1 }}>
@@ -623,7 +658,7 @@ const HomePage: React.FC<HomePageProps> = ({
             </div>
           </Space>
         </Col>
-        <Col span={3}></Col>
+        <Col span={4}></Col>
       </Row>
 
       <Divider />
@@ -762,6 +797,7 @@ const HomePage: React.FC<HomePageProps> = ({
                     danger
                     size="large"
                     onClick={handleDecreaseInventory}
+                    loading={isModifyLoading}
                     block
                   >
                     Modifica Variante
@@ -907,7 +943,7 @@ const HomePage: React.FC<HomePageProps> = ({
       >
         <div style={{ textAlign: "center" }}>
           <p>
-            Taglia <Text strong>{selectedVariant}</Text> dell'articolo{" "}
+            Taglia <Text strong>{lastModifiedVariant}</Text> dell'articolo{" "}
             <Text strong>{productDetails?.nomeArticolo}</Text> è stata rimossa
           </p>
           <Space>
@@ -915,7 +951,11 @@ const HomePage: React.FC<HomePageProps> = ({
               type="primary"
               danger
               icon={<UndoOutlined />}
-              onClick={handleUndoChange}
+              onClick={() => {
+                console.log("🖱️ Annulla Operazione button clicked!");
+                handleUndoChange();
+              }}
+              loading={isUndoLoading}
             >
               Annulla Operazione
             </Button>
@@ -935,7 +975,7 @@ const HomePage: React.FC<HomePageProps> = ({
       >
         <div style={{ textAlign: "center" }}>
           <p>
-            Taglia <Text strong>{selectedVariant}</Text> dell'articolo{" "}
+            Taglia <Text strong>{lastModifiedVariant}</Text> dell'articolo{" "}
             <Text strong>{productDetails?.nomeArticolo}</Text> è stata
             re-inserita
           </p>
