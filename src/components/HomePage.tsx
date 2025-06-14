@@ -1123,8 +1123,8 @@ const HomePage: React.FC<HomePageProps> = ({
               </Col>
             </Row>
 
-            <Row gutter={[16, 16]} justify="center">
-              <Col xs={24} sm={12} lg={8}>
+            <Row gutter={16} justify="center">
+              <Col span={6}>
                 <Button
                   type="primary"
                   icon={<ShopOutlined />}
@@ -1135,7 +1135,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   Shopify
                 </Button>
               </Col>
-              <Col xs={24} sm={12} lg={8}>
+              <Col span={6}>
                 <Button
                   type="primary"
                   icon={<GlobalOutlined />}
@@ -1146,7 +1146,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   Sito
                 </Button>
               </Col>
-              <Col xs={24} sm={12} lg={8}>
+              <Col span={6}>
                 <Button
                   type="default"
                   icon={<HistoryOutlined />}
@@ -1158,7 +1158,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   Cronologia
                 </Button>
               </Col>
-              <Col xs={24} sm={12} lg={8}>
+              <Col span={6}>
                 <Button
                   type="default"
                   icon={<CheckCircleOutlined />}
@@ -1167,7 +1167,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   disabled={!productDetails}
                   block
                 >
-                  Richiesta Controllo
+                  Controlli
                 </Button>
               </Col>
             </Row>
