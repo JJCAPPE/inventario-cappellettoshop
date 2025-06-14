@@ -41,6 +41,29 @@ import CheckRequestModal from "./CheckRequestModal";
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
 
+// Centralized location configuration
+type LocationName = "Treviso" | "Mogliano";
+
+const AVAILABLE_LOCATIONS: readonly LocationName[] = [
+  "Treviso",
+  "Mogliano",
+] as const;
+const DEFAULT_PRIMARY_LOCATION: LocationName = "Treviso";
+
+const LOCATION_CONFIG = {
+  availableLocations: AVAILABLE_LOCATIONS,
+  defaultPrimary: DEFAULT_PRIMARY_LOCATION,
+  getSecondaryLocation: (primary: string): LocationName => {
+    return (
+      AVAILABLE_LOCATIONS.find((loc: LocationName) => loc !== primary) ||
+      AVAILABLE_LOCATIONS[0]
+    );
+  },
+  isValidLocation: (location: string): location is LocationName => {
+    return AVAILABLE_LOCATIONS.includes(location as LocationName);
+  },
+};
+
 interface HomePageProps {
   targetProductId?: string | null;
   onTargetProductProcessed?: () => void;
@@ -58,9 +81,12 @@ const HomePage: React.FC<HomePageProps> = ({
   const [secondaryProductDetails, setSecondaryProductDetails] =
     useState<SecondaryDetails | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
-  const [primaryLocation, setPrimaryLocation] = useState<string>("Treviso");
-  const [secondaryLocation, setSecondaryLocation] =
-    useState<string>("Mogliano");
+  const [primaryLocation, setPrimaryLocation] = useState<LocationName>(
+    LOCATION_CONFIG.defaultPrimary
+  );
+  const [secondaryLocation, setSecondaryLocation] = useState<LocationName>(
+    LOCATION_CONFIG.getSecondaryLocation(LOCATION_CONFIG.defaultPrimary)
+  );
   const [lastSelectedQuery, setLastSelectedQuery] = useState<string>("");
   const [modifyModalVisible, setModifyModalVisible] = useState(false);
   const [undoModalVisible, setUndoModalVisible] = useState(false);
@@ -85,14 +111,9 @@ const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     // Load saved location preference from localStorage
     const savedLocation = localStorage.getItem("primaryLocation");
-    if (
-      savedLocation &&
-      (savedLocation === "Treviso" || savedLocation === "Mogliano")
-    ) {
+    if (savedLocation && LOCATION_CONFIG.isValidLocation(savedLocation)) {
       setPrimaryLocation(savedLocation);
-      setSecondaryLocation(
-        savedLocation === "Treviso" ? "Mogliano" : "Treviso"
-      );
+      setSecondaryLocation(LOCATION_CONFIG.getSecondaryLocation(savedLocation));
     }
 
     // Load saved search sort preference from localStorage
@@ -164,15 +185,19 @@ const HomePage: React.FC<HomePageProps> = ({
   }, [targetProductId, onTargetProductProcessed]);
 
   const handleLocationChange = (newPrimaryLocation: string) => {
-    setPrimaryLocation(newPrimaryLocation);
-    setSecondaryLocation(
-      newPrimaryLocation === "Treviso" ? "Mogliano" : "Treviso"
-    );
+    if (LOCATION_CONFIG.isValidLocation(newPrimaryLocation)) {
+      setPrimaryLocation(newPrimaryLocation);
+      setSecondaryLocation(
+        LOCATION_CONFIG.getSecondaryLocation(newPrimaryLocation)
+      );
 
-    // Save to localStorage
-    localStorage.setItem("primaryLocation", newPrimaryLocation);
+      // Save to localStorage
+      localStorage.setItem("primaryLocation", newPrimaryLocation);
 
-    message.success(`Posizione principale cambiata a ${newPrimaryLocation}`);
+      message.success(`Posizione principale cambiata a ${newPrimaryLocation}`);
+    } else {
+      message.error(`Posizione non valida: ${newPrimaryLocation}`);
+    }
   };
 
   const handleSearchSortChange = (newSortKey: string) => {
@@ -393,8 +418,9 @@ const HomePage: React.FC<HomePageProps> = ({
           console.log("📍 Location config:", locationConfig);
 
           // Determine the correct location ID based on primary location
+          // Note: This assumes the API locationConfig maps to our LOCATION_CONFIG
           const locationId =
-            primaryLocation === "Treviso"
+            primaryLocation === LOCATION_CONFIG.availableLocations[0]
               ? locationConfig.primary_location.id
               : locationConfig.secondary_location.id;
 
@@ -503,8 +529,9 @@ const HomePage: React.FC<HomePageProps> = ({
       console.log("📍 Location config:", locationConfig);
 
       // Determine the correct location ID based on primary location
+      // Note: This assumes the API locationConfig maps to our LOCATION_CONFIG
       const locationId =
-        primaryLocation === "Treviso"
+        primaryLocation === LOCATION_CONFIG.availableLocations[0]
           ? locationConfig.primary_location.id
           : locationConfig.secondary_location.id;
 
@@ -723,16 +750,52 @@ const HomePage: React.FC<HomePageProps> = ({
 
           <Col span={12}>
             {/* Variants Layout - Side by Side */}
-            <Row gutter={8} style={{ marginBottom: 16 }}>
+            <Row
+              gutter={8}
+              style={{
+                marginBottom: 16,
+                display: "flex",
+                alignItems: "stretch",
+              }}
+            >
               {/* Primary Location Variants */}
-              <Col span={secondaryPanelExpanded ? 12 : 16}>
+              <Col span={secondaryPanelExpanded ? 8 : 18}>
                 <Card
-                  title={`Varianti ${negozio}`}
-                  size="small"
-                  style={{ height: "auto" }}
+                  title={
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <span>{negozio}</span>
+                      <Badge
+                        count={productDetails.varaintiArticolo.reduce(
+                          (total, variant) =>
+                            total + variant.inventory_quantity,
+                          0
+                        )}
+                        showZero={true}
+                        style={{
+                          backgroundColor:
+                            productDetails.varaintiArticolo.reduce(
+                              (total, variant) =>
+                                total + variant.inventory_quantity,
+                              0
+                            ) > 0
+                              ? "#1890ff"
+                              : "#f5222d",
+                        }}
+                        size="default"
+                      />
+                    </div>
+                  }
+                  style={{ height: "100%" }}
                 >
                   <List
                     size="small"
+                    split={false}
                     dataSource={productDetails.varaintiArticolo}
                     renderItem={(variant) => {
                       const isOutOfStock = variant.inventory_quantity === 0;
@@ -754,8 +817,11 @@ const HomePage: React.FC<HomePageProps> = ({
                               ? "1px solid #1890ff"
                               : "1px solid transparent",
                             borderRadius: "8px",
-                            marginBottom: "2px",
+                            marginBottom: "3px",
                             opacity: isOutOfStock ? 0.6 : 1,
+                            height: "36px",
+                            display: "flex",
+                            alignItems: "center",
                           }}
                           onClick={() => handleVariantSelect(variant.title)}
                         >
@@ -763,7 +829,9 @@ const HomePage: React.FC<HomePageProps> = ({
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
+                              alignItems: "center",
                               width: "100%",
+                              height: "100%",
                             }}
                           >
                             <div
@@ -794,11 +862,13 @@ const HomePage: React.FC<HomePageProps> = ({
                             </div>
                             <Badge
                               count={variant.inventory_quantity}
+                              showZero={true}
                               style={{
                                 backgroundColor:
                                   variant.inventory_quantity > 0
                                     ? "#52c41a"
                                     : "#f5222d",
+                                marginRight: "46px",
                               }}
                               size="small"
                             />
@@ -826,10 +896,9 @@ const HomePage: React.FC<HomePageProps> = ({
               </Col>
 
               {/* Secondary Location Variants */}
-              <Col span={secondaryPanelExpanded ? 12 : 8}>
+              <Col span={secondaryPanelExpanded ? 16 : 6}>
                 <Card
-                  size="small"
-                  style={{ height: "auto" }}
+                  style={{ height: "100%" }}
                   title={
                     <div
                       style={{
@@ -842,10 +911,38 @@ const HomePage: React.FC<HomePageProps> = ({
                         setSecondaryPanelExpanded(!secondaryPanelExpanded)
                       }
                     >
-                      <span>{secondario}</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
+                        <span>{secondario}</span>
+                        <Badge
+                          count={
+                            secondaryProductDetails?.availableVariants?.reduce(
+                              (total, variant) =>
+                                total + variant.inventory_quantity,
+                              0
+                            ) || 0
+                          }
+                          showZero={true}
+                          style={{
+                            backgroundColor:
+                              (secondaryProductDetails?.availableVariants?.reduce(
+                                (total, variant) =>
+                                  total + variant.inventory_quantity,
+                                0
+                              ) || 0) > 0
+                                ? "#1890ff"
+                                : "#f5222d",
+                          }}
+                          size="default"
+                        />
+                      </div>
                       <Button
                         type="text"
-                        size="small"
                         icon={
                           secondaryPanelExpanded ? (
                             <LeftOutlined />
@@ -876,15 +973,20 @@ const HomePage: React.FC<HomePageProps> = ({
                                 padding: "6px 8px",
                                 border: "1px solid transparent",
                                 borderRadius: "8px",
-                                marginBottom: "2px",
+                                marginBottom: "3px",
                                 opacity: isOutOfStock ? 0.6 : 1,
+                                height: "36px",
+                                display: "flex",
+                                alignItems: "center",
                               }}
                             >
                               <div
                                 style={{
                                   display: "flex",
                                   justifyContent: "space-between",
+                                  alignItems: "center",
                                   width: "100%",
+                                  height: "100%",
                                 }}
                               >
                                 <div
@@ -918,11 +1020,13 @@ const HomePage: React.FC<HomePageProps> = ({
                                 </div>
                                 <Badge
                                   count={variant.inventory_quantity}
+                                  showZero={true}
                                   style={{
                                     backgroundColor:
                                       variant.inventory_quantity > 0
                                         ? "#52c41a"
                                         : "#f5222d",
+                                    marginRight: "46px",
                                   }}
                                   size="small"
                                 />
@@ -937,67 +1041,63 @@ const HomePage: React.FC<HomePageProps> = ({
                       </Text>
                     )
                   ) : (
-                    // Collapsed view - quantities aligned with primary variants
-                    <div>
+                    // Collapsed view - quantities aligned with primary variants using plain divs
+                    <div style={{ padding: "0" }}>
                       {secondaryProductDetails &&
                       secondaryProductDetails.availableVariants.length > 0 ? (
-                        <List
-                          size="small"
-                          dataSource={productDetails.varaintiArticolo}
-                          renderItem={(primaryVariant) => {
-                            // Find matching variant in secondary location
-                            const secondaryVariant =
-                              secondaryProductDetails.availableVariants.find(
-                                (sv) => sv.title === primaryVariant.title
-                              );
+                        <div>
+                          {productDetails.varaintiArticolo.map(
+                            (primaryVariant, index) => {
+                              // Find matching variant in secondary location
+                              const secondaryVariant =
+                                secondaryProductDetails.availableVariants.find(
+                                  (sv) => sv.title === primaryVariant.title
+                                );
 
-                            return (
-                              <List.Item
-                                style={{
-                                  padding: "6px 8px",
-                                  borderRadius: "8px",
-                                  marginBottom: "2px",
-                                  backgroundColor: "transparent",
-                                  display: "flex",
-                                  justifyContent: "center",
-                                  alignItems: "center",
-                                  minHeight: "32px", // Match the height of primary items
-                                }}
-                              >
-                                {secondaryVariant ? (
+                              // Check if out of stock (either missing or 0 quantity)
+                              const isOutOfStock =
+                                !secondaryVariant ||
+                                secondaryVariant.inventory_quantity === 0;
+
+                              return (
+                                <div
+                                  key={index}
+                                  style={{
+                                    padding: "6px 8px",
+                                    border: "1px solid transparent",
+                                    borderRadius: "8px",
+                                    marginBottom: "3px",
+                                    backgroundColor: isOutOfStock
+                                      ? "#f5f5f5"
+                                      : "transparent",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    opacity: isOutOfStock ? 0.6 : 1,
+                                    minHeight: "36px", // Match exact List.Item height
+                                  }}
+                                >
                                   <Badge
-                                    count={secondaryVariant.inventory_quantity}
+                                    count={
+                                      secondaryVariant
+                                        ? secondaryVariant.inventory_quantity
+                                        : 0
+                                    }
+                                    showZero={true}
                                     style={{
                                       backgroundColor:
+                                        secondaryVariant &&
                                         secondaryVariant.inventory_quantity > 0
                                           ? "#52c41a"
                                           : "#f5222d",
                                     }}
                                     size="small"
                                   />
-                                ) : (
-                                  <div
-                                    style={{
-                                      width: "16px",
-                                      height: "16px",
-                                      borderRadius: "50%",
-                                      backgroundColor: "#d9d9d9",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                    }}
-                                  >
-                                    <Text
-                                      style={{ fontSize: "8px", color: "#999" }}
-                                    >
-                                      -
-                                    </Text>
-                                  </div>
-                                )}
-                              </List.Item>
-                            );
-                          }}
-                        />
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
                       ) : (
                         <div
                           style={{
@@ -1176,31 +1276,23 @@ const HomePage: React.FC<HomePageProps> = ({
             style={{ width: "100%" }}
           >
             <Space direction="vertical" style={{ width: "100%" }}>
-              <Radio value="Treviso" style={{ fontSize: 16, padding: "8px 0" }}>
-                <Space>
-                  <span>Treviso</span>
-                  {primaryLocation === "Treviso" && (
-                    <Tag color="blue">Principale</Tag>
-                  )}
-                  {secondaryLocation === "Treviso" && (
-                    <Tag color="default">Secondario</Tag>
-                  )}
-                </Space>
-              </Radio>
-              <Radio
-                value="Mogliano"
-                style={{ fontSize: 16, padding: "8px 0" }}
-              >
-                <Space>
-                  <span>Mogliano</span>
-                  {primaryLocation === "Mogliano" && (
-                    <Tag color="blue">Principale</Tag>
-                  )}
-                  {secondaryLocation === "Mogliano" && (
-                    <Tag color="default">Secondario</Tag>
-                  )}
-                </Space>
-              </Radio>
+              {LOCATION_CONFIG.availableLocations.map((location) => (
+                <Radio
+                  key={location}
+                  value={location}
+                  style={{ fontSize: 16, padding: "8px 0" }}
+                >
+                  <Space>
+                    <span>{location}</span>
+                    {primaryLocation === location && (
+                      <Tag color="blue">Principale</Tag>
+                    )}
+                    {secondaryLocation === location && (
+                      <Tag color="default">Secondario</Tag>
+                    )}
+                  </Space>
+                </Radio>
+              ))}
             </Space>
           </Radio.Group>
 
