@@ -252,7 +252,8 @@ const DataPage: React.FC<DataPageProps> = ({ onNavigateToProduct }) => {
                   <div>
                     <Space direction="vertical" size={2}>
                       <Text style={{ fontSize: 12 }}>
-                        <strong>Orario Vendita:</strong> {formatTime(log.timestamp)}
+                        <strong>Orario Vendita:</strong>{" "}
+                        {formatTime(log.timestamp)}
                       </Text>
                       <Text style={{ fontSize: 12 }}>
                         <strong>Prezzo:</strong> €{log.data.prezzo}
