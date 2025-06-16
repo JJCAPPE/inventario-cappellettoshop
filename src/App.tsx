@@ -1,16 +1,28 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Layout, Button, Drawer, ConfigProvider } from "antd";
+import {
+  Layout,
+  Button,
+  Drawer,
+  ConfigProvider,
+  notification,
+  message,
+} from "antd";
 
 import {
   DatabaseOutlined,
   CloseOutlined,
   CheckCircleOutlined,
+  DownloadOutlined,
+  RocketOutlined,
 } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
 import CheckRequestsPage from "./components/CheckRequestsPage";
 import StatisticsPage from "./components/StatisticsPage";
+import UpdateModal from "./components/UpdateModal";
 import { LogProvider } from "./contexts/LogContext";
+import { useUpdater } from "./hooks/useUpdater";
+import { getDisplayVersion, getAppVersion } from "./utils/version";
 import "antd/dist/reset.css";
 import "./App.css";
 
@@ -79,8 +91,21 @@ function App() {
   const [targetProductId, setTargetProductId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
+  // Initialize updater with configuration
+  const {
+    update,
+    isChecking,
+    showUpdateModal,
+    checkForUpdates,
+    closeUpdateModal,
+  } = useUpdater({
+    checkOnMount: true, // Check for updates when app starts
+    checkInterval: 30 * 60 * 1000, // Check every 30 minutes
+    showErrorMessages: false, // Don't show error messages automatically
+  });
+
   useEffect(() => {
-    document.title = "Inventario CappellettoShop";
+    document.title = `Inventario CappellettoShop ${getDisplayVersion()}`;
   }, []);
 
   // Function to handle navigation to a specific product
@@ -88,6 +113,65 @@ function App() {
     console.log("🚀 App: Navigating to product:", productId);
     setTargetProductId(productId);
     setSidebarVisible(false); // Close the sidebar when navigating
+  };
+
+  // Manual update check function
+  const handleManualUpdateCheck = async () => {
+    console.log("🔍 Manual update check triggered");
+
+    try {
+      await checkForUpdates();
+
+      // If no update was found (modal didn't show), inform the user
+      setTimeout(() => {
+        if (!showUpdateModal) {
+          message.success({
+            content: "La tua app è già aggiornata all'ultima versione",
+            duration: 3,
+          });
+
+          notification.success({
+            message: "App Aggiornata",
+            description: "Stai già utilizzando l'ultima versione disponibile",
+            icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+            duration: 4,
+            placement: "topRight",
+          });
+        }
+      }, 500);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Errore nel controllo aggiornamenti";
+
+      message.error({
+        content: errorMessage,
+        duration: 4,
+      });
+
+      notification.error({
+        message: "Errore Controllo Aggiornamenti",
+        description: errorMessage,
+        duration: 6,
+        placement: "topRight",
+      });
+    }
+  };
+
+  // Handle update completion
+  const handleUpdateCompleted = () => {
+    console.log("✅ Update completed successfully from App component");
+
+    // Show celebration notification
+    notification.success({
+      message: "🎉 Aggiornamento Completato!",
+      description:
+        "L'applicazione è stata aggiornata con successo. Tutte le nuove funzionalità sono ora disponibili!",
+      icon: <RocketOutlined style={{ color: "#52c41a" }} />,
+      duration: 10,
+      placement: "topRight",
+    });
   };
 
   // Simplified toggle function
@@ -226,6 +310,22 @@ function App() {
             }}
           >
             <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
+              {/* Update Check Button */}
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={handleManualUpdateCheck}
+                loading={isChecking}
+                style={{
+                  background: "transparent",
+                  borderColor: "#d9d9d9",
+                  color: "#d9d9d9",
+                  transition: "all 0.2s ease",
+                }}
+                title="Controlla aggiornamenti"
+              >
+                {isChecking ? "Controllo..." : "Aggiornamenti"}
+              </Button>
+
               <Button
                 className={
                   sidebarVisible && currentView === "checkRequests"
@@ -318,7 +418,7 @@ function App() {
                   pointerEvents: "none",
                 }}
               >
-                v3.0.0
+                {getDisplayVersion()}
               </div>
             </Content>
 
@@ -375,6 +475,14 @@ function App() {
               </div>
             )}
           </Layout>
+
+          {/* Update Modal */}
+          <UpdateModal
+            visible={showUpdateModal}
+            update={update}
+            onClose={closeUpdateModal}
+            onUpdateCompleted={handleUpdateCompleted}
+          />
         </Layout>
       </ConfigProvider>
     </LogProvider>
