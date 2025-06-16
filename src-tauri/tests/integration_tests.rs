@@ -46,9 +46,6 @@ fn test_config_api_url_generation() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        github_token: "test-github-token".to_string(),
-        github_owner: "test-owner".to_string(),
-        github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     };
 
@@ -76,9 +73,6 @@ fn test_config_headers() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        github_token: "test-github-token".to_string(),
-        github_owner: "test-owner".to_string(),
-        github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     };
 
@@ -264,9 +258,6 @@ fn setup_test_config() -> AppConfig {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        github_token: "test-github-token".to_string(),
-        github_owner: "test-owner".to_string(),
-        github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     }
 }
@@ -296,15 +287,7 @@ fn test_firebase_config_helper() {
     assert_eq!(firebase_config.auth_domain, "test.firebaseapp.com");
 }
 
-#[test]
-fn test_github_config_helper() {
-    let config = setup_test_config();
-    let github_config = config.get_github_config();
 
-    assert_eq!(github_config.token, "test-github-token");
-    assert_eq!(github_config.owner, "test-owner");
-    assert_eq!(github_config.repo, "test-repo");
-}
 
 // ============================================================================
 // ERROR HANDLING TESTS
@@ -411,9 +394,6 @@ fn test_config_validation() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        github_token: "test-github-token".to_string(),
-        github_owner: "test-owner".to_string(),
-        github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     };
 
@@ -1072,9 +1052,6 @@ fn test_missing_required_config_fields() {
                 firebase_messaging_sender_id: "123456".to_string(),
                 firebase_app_id: "1:123456:web:abc123".to_string(),
                 firebase_measurement_id: "G-ABC123".to_string(),
-                github_token: "test-github-token".to_string(),
-                github_owner: "test-owner".to_string(),
-                github_repo: "test-repo".to_string(),
                 version: "3.0.0".to_string(),
             },
             "shop_domain should not be empty",
@@ -1096,9 +1073,6 @@ fn test_missing_required_config_fields() {
                 firebase_messaging_sender_id: "123456".to_string(),
                 firebase_app_id: "1:123456:web:abc123".to_string(),
                 firebase_measurement_id: "G-ABC123".to_string(),
-                github_token: "test-github-token".to_string(),
-                github_owner: "test-owner".to_string(),
-                github_repo: "test-repo".to_string(),
                 version: "3.0.0".to_string(),
             },
             "access_token should not be empty",

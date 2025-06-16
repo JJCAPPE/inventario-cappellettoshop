@@ -718,9 +718,6 @@ fn test_dry_run_all_functions() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        github_token: "test-github-token".to_string(),
-        github_owner: "test-owner".to_string(),
-        github_repo: "test-repo".to_string(),
         version: "3.0.0".to_string(),
     };
 
@@ -751,11 +748,6 @@ fn test_dry_run_all_functions() {
     let firebase_config = config.get_firebase_config();
     assert_eq!(firebase_config.api_key, "test-firebase-key");
     assert_eq!(firebase_config.project_id, "test-project");
-
-    // Test GitHub config helper
-    let github_config = config.get_github_config();
-    assert_eq!(github_config.token, "test-github-token");
-    assert_eq!(github_config.owner, "test-owner");
 
     println!("✅ All dry-run tests passed");
 }

@@ -13,6 +13,7 @@ use inventario_cappellettoshop_lib::utils::AppConfig;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // Initialize app configuration from environment
