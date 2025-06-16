@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Update } from "@tauri-apps/plugin-updater";
 import UpdaterService from "../services/updater";
 import { message } from "antd";
@@ -14,6 +14,7 @@ interface UseUpdaterReturn {
   isChecking: boolean;
   error: string | null;
   showUpdateModal: boolean;
+  lastCheckFoundNoUpdate: boolean;
   checkForUpdates: () => Promise<void>;
   openUpdateModal: () => void;
   closeUpdateModal: () => void;
@@ -33,12 +34,21 @@ export const useUpdater = (
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [lastCheckFoundNoUpdate, setLastCheckFoundNoUpdate] = useState(false);
+
+  // Use ref to track if we're already checking to prevent race conditions
+  const isCheckingRef = useRef(false);
 
   const checkForUpdates = useCallback(async () => {
-    if (isChecking) return;
+    if (isCheckingRef.current) {
+      console.log("🔄 useUpdater: Update check already in progress, skipping");
+      return;
+    }
 
+    isCheckingRef.current = true;
     setIsChecking(true);
     setError(null);
+    setLastCheckFoundNoUpdate(false);
 
     try {
       console.log("🔍 useUpdater: Checking for updates...");
@@ -48,12 +58,14 @@ export const useUpdater = (
         console.log("✅ useUpdater: Update found:", availableUpdate.version);
         setUpdate(availableUpdate);
         setShowUpdateModal(true);
+        setLastCheckFoundNoUpdate(false);
         message.info(
           `Aggiornamento disponibile: versione ${availableUpdate.version}`
         );
       } else {
         console.log("ℹ️ useUpdater: No updates available");
         setUpdate(null);
+        setLastCheckFoundNoUpdate(true);
       }
     } catch (err) {
       const errorMessage =
@@ -68,8 +80,9 @@ export const useUpdater = (
       }
     } finally {
       setIsChecking(false);
+      isCheckingRef.current = false;
     }
-  }, [isChecking, showErrorMessages]);
+  }, [showErrorMessages]); // Removed isChecking from dependencies
 
   const openUpdateModal = useCallback(() => {
     setShowUpdateModal(true);
@@ -89,14 +102,16 @@ export const useUpdater = (
       console.log("🚀 useUpdater: Checking for updates on mount");
       checkForUpdates();
     }
-  }, [checkOnMount, checkForUpdates]);
+  }, [checkOnMount]); // Removed checkForUpdates from dependencies to prevent re-running
 
   // Set up periodic checking if interval is provided
   useEffect(() => {
     if (!checkInterval || checkInterval <= 0) return;
 
     console.log(
-      `⏰ useUpdater: Setting up periodic update check every ${checkInterval}ms`
+      `⏰ useUpdater: Setting up periodic update check every ${checkInterval}ms (${
+        checkInterval / 1000 / 60
+      } minutes)`
     );
 
     const intervalId = setInterval(() => {
@@ -108,13 +123,14 @@ export const useUpdater = (
       console.log("🛑 useUpdater: Clearing periodic update check");
       clearInterval(intervalId);
     };
-  }, [checkInterval, checkForUpdates]);
+  }, [checkInterval]); // Removed checkForUpdates from dependencies to prevent multiple intervals
 
   return {
     update,
     isChecking,
     error,
     showUpdateModal,
+    lastCheckFoundNoUpdate,
     checkForUpdates,
     openUpdateModal,
     closeUpdateModal,

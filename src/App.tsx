@@ -96,6 +96,7 @@ function App() {
     update,
     isChecking,
     showUpdateModal,
+    lastCheckFoundNoUpdate,
     checkForUpdates,
     closeUpdateModal,
   } = useUpdater({
@@ -128,14 +129,6 @@ function App() {
           message.success({
             content: "La tua app è già aggiornata all'ultima versione",
             duration: 3,
-          });
-
-          notification.success({
-            message: "App Aggiornata",
-            description: "Stai già utilizzando l'ultima versione disponibile",
-            icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
-            duration: 4,
-            placement: "topRight",
           });
         }
       }, 500);
@@ -312,18 +305,36 @@ function App() {
             <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
               {/* Update Check Button */}
               <Button
-                icon={<DownloadOutlined />}
+                icon={
+                  isChecking ? (
+                    <DownloadOutlined />
+                  ) : lastCheckFoundNoUpdate ? (
+                    <CheckCircleOutlined />
+                  ) : (
+                    <DownloadOutlined />
+                  )
+                }
                 onClick={handleManualUpdateCheck}
                 loading={isChecking}
                 style={{
                   background: "transparent",
-                  borderColor: "#d9d9d9",
-                  color: "#d9d9d9",
+                  borderColor: lastCheckFoundNoUpdate ? "#52c41a" : "#d9d9d9",
+                  color: lastCheckFoundNoUpdate ? "#52c41a" : "#d9d9d9",
                   transition: "all 0.2s ease",
                 }}
-                title="Controlla aggiornamenti"
+                title={
+                  isChecking
+                    ? "Controllo aggiornamenti in corso..."
+                    : lastCheckFoundNoUpdate
+                    ? "App aggiornata - Clicca per ricontrollare"
+                    : "Controlla aggiornamenti"
+                }
               >
-                {isChecking ? "Controllo..." : "Aggiornamenti"}
+                {isChecking
+                  ? "Controllo..."
+                  : lastCheckFoundNoUpdate
+                  ? "Aggiornata"
+                  : "Aggiornamenti"}
               </Button>
 
               <Button
