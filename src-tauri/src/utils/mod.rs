@@ -70,8 +70,26 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn from_env() -> Result<Self, String> {
+        // Try to load .env file for development
         dotenvy::dotenv().ok();
 
+        // Check if we're in development mode
+        let is_dev = std::env::var("DEV_ENV")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+
+        if is_dev {
+            // Development mode: Use runtime environment variables from .env file
+            Self::from_runtime_env()
+        } else {
+            // Production mode: Use compile-time environment variables
+            Self::from_compile_time_env()
+        }
+    }
+
+    /// Load configuration from runtime environment variables (development)
+    fn from_runtime_env() -> Result<Self, String> {
         // Shopify Configuration
         let shop_domain = std::env::var("SHOPIFY_SHOP_DOMAIN")
             .map_err(|_| "SHOPIFY_SHOP_DOMAIN must be set in .env file")?;
@@ -106,6 +124,81 @@ impl AppConfig {
 
         // App Configuration
         let version = std::env::var("VERSION").unwrap_or_else(|_| "3.0.1".to_string());
+
+        Ok(AppConfig {
+            shop_domain,
+            access_token,
+            api_key,
+            api_secret,
+            api_version,
+            primary_location,
+            secondary_location,
+            firebase_api_key,
+            firebase_auth_domain,
+            firebase_project_id,
+            firebase_storage_bucket,
+            firebase_messaging_sender_id,
+            firebase_app_id,
+            firebase_measurement_id,
+            version,
+        })
+    }
+
+    /// Load configuration from compile-time environment variables (production)
+    fn from_compile_time_env() -> Result<Self, String> {
+        // In production mode, these variables should be embedded at compile time
+        // We use option_env! to make them optional during development compilation
+
+        // Shopify Configuration
+        let shop_domain = option_env!("SHOPIFY_SHOP_DOMAIN")
+            .ok_or("SHOPIFY_SHOP_DOMAIN must be set at compile time for production builds")?
+            .to_string();
+        let access_token = option_env!("SHOPIFY_ACCESS_TOKEN")
+            .ok_or("SHOPIFY_ACCESS_TOKEN must be set at compile time for production builds")?
+            .to_string();
+        let api_key = option_env!("SHOPIFY_API_KEY")
+            .ok_or("SHOPIFY_API_KEY must be set at compile time for production builds")?
+            .to_string();
+        let api_secret = option_env!("SHOPIFY_API_SECRET_KEY")
+            .ok_or("SHOPIFY_API_SECRET_KEY must be set at compile time for production builds")?
+            .to_string();
+        let api_version = option_env!("SHOPIFY_API_VERSION")
+            .unwrap_or("2025-01")
+            .to_string();
+        let primary_location = option_env!("LOCATION_TREVISO")
+            .ok_or("LOCATION_TREVISO must be set at compile time for production builds")?
+            .to_string();
+        let secondary_location = option_env!("LOCATION_MOGLIANO")
+            .ok_or("LOCATION_MOGLIANO must be set at compile time for production builds")?
+            .to_string();
+
+        // Firebase Configuration
+        let firebase_api_key = option_env!("FIREBASE_API_KEY")
+            .ok_or("FIREBASE_API_KEY must be set at compile time for production builds")?
+            .to_string();
+        let firebase_auth_domain = option_env!("FIREBASE_AUTH_DOMAIN")
+            .ok_or("FIREBASE_AUTH_DOMAIN must be set at compile time for production builds")?
+            .to_string();
+        let firebase_project_id = option_env!("FIREBASE_PROJECT_ID")
+            .ok_or("FIREBASE_PROJECT_ID must be set at compile time for production builds")?
+            .to_string();
+        let firebase_storage_bucket = option_env!("FIREBASE_STORAGE_BUCKET")
+            .ok_or("FIREBASE_STORAGE_BUCKET must be set at compile time for production builds")?
+            .to_string();
+        let firebase_messaging_sender_id = option_env!("FIREBASE_MESSAGING_SENDER_ID")
+            .ok_or(
+                "FIREBASE_MESSAGING_SENDER_ID must be set at compile time for production builds",
+            )?
+            .to_string();
+        let firebase_app_id = option_env!("FIREBASE_APP_ID")
+            .ok_or("FIREBASE_APP_ID must be set at compile time for production builds")?
+            .to_string();
+        let firebase_measurement_id = option_env!("FIREBASE_MEASUREMENT_ID")
+            .ok_or("FIREBASE_MEASUREMENT_ID must be set at compile time for production builds")?
+            .to_string();
+
+        // App Configuration
+        let version = option_env!("VERSION").unwrap_or("3.0.1").to_string();
 
         Ok(AppConfig {
             shop_domain,
