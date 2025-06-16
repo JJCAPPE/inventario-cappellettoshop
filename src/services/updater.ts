@@ -1,9 +1,9 @@
-import { check, Update } from "@tauri-apps/plugin-updater";
+import { check, Update, DownloadEvent } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
 export interface UpdateProgress {
   event: "Started" | "Progress" | "Finished";
-  data: {
+  data?: {
     contentLength?: number;
     chunkLength?: number;
   };
@@ -55,10 +55,15 @@ export class UpdaterService {
     try {
       console.log("📥 Starting update download and installation...");
 
-      await update.downloadAndInstall((event) => {
+      await update.downloadAndInstall((event: DownloadEvent) => {
         console.log("📊 Update progress:", event);
         if (onProgress) {
-          onProgress(event);
+          // Convert DownloadEvent to UpdateProgress
+          const progress: UpdateProgress = {
+            event: event.event,
+            data: "data" in event ? event.data : undefined,
+          };
+          onProgress(progress);
         }
       });
 

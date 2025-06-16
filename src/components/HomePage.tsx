@@ -12,7 +12,6 @@ import {
   message,
   Divider,
   Badge,
-  Collapse,
   Typography,
   Radio,
   Switch,
@@ -39,7 +38,6 @@ import ModificationHistoryModal from "./ModificationHistoryModal";
 import CheckRequestModal from "./CheckRequestModal";
 
 const { Title, Text } = Typography;
-const { Panel } = Collapse;
 
 // Centralized location configuration
 type LocationName = "Treviso" | "Mogliano";

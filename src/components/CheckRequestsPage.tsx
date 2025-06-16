@@ -11,7 +11,6 @@ import {
   Alert,
   Spin,
   Select,
-  DatePicker,
   Row,
   Col,
 } from "antd";
@@ -36,7 +35,6 @@ dayjs.locale("it");
 const { Text } = Typography;
 const { Search } = Input;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 interface CheckRequestsPageProps {
   onNavigateToProduct?: (productId: string) => void;
@@ -222,14 +220,6 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
     fetchCheckRequests();
     setActionModalVisible(false);
     setSelectedRequest(null);
-  };
-
-  const handleDateRangeChange = (dates: any) => {
-    if (dates && dates[0] && dates[1]) {
-      setDateRange([dates[0], dates[1]]);
-    } else {
-      setDateRange(null);
-    }
   };
 
   return (

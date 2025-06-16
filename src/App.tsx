@@ -22,7 +22,7 @@ import StatisticsPage from "./components/StatisticsPage";
 import UpdateModal from "./components/UpdateModal";
 import { LogProvider } from "./contexts/LogContext";
 import { useUpdater } from "./hooks/useUpdater";
-import { getDisplayVersion, getAppVersion } from "./utils/version";
+import { getDisplayVersion } from "./utils/version";
 import "antd/dist/reset.css";
 import "./App.css";
 

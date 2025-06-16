@@ -91,7 +91,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
         (progress: UpdateProgress) => {
           switch (progress.event) {
             case "Started":
-              if (progress.data.contentLength) {
+              if (progress.data?.contentLength) {
                 setDownloadSize(progress.data.contentLength);
 
                 // Toast for download start
@@ -115,9 +115,9 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
               break;
 
             case "Progress":
-              if (progress.data.chunkLength) {
+              if (progress.data?.chunkLength) {
                 setDownloadedBytes((prev) => {
-                  const newTotal = prev + progress.data.chunkLength!;
+                  const newTotal = prev + progress.data!.chunkLength!;
                   if (downloadSize) {
                     const newProgress = Math.round(
                       (newTotal / downloadSize) * 100
