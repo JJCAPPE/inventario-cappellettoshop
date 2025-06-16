@@ -111,9 +111,9 @@ FIREBASE_APP_ID=your-app-id
 FIREBASE_MEASUREMENT_ID=your-measurement-id
 
 # GitHub Auto-Updater (optional for basic tests)
-GITHUB_TOKEN=your-github-token
-GITHUB_OWNER=your-github-username
-GITHUB_REPO=your-repo-name
+UPDATER_GITHUB_TOKEN=your-github-token
+UPDATER_GITHUB_OWNER=your-github-username
+UPDATER_GITHUB_REPO=your-repo-name
 
 # App Version
 VERSION=3.0.0

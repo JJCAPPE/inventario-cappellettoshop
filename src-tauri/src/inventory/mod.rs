@@ -549,7 +549,7 @@ pub async fn get_product_modification_history(
 
 /// Group modifications by date and calculate net changes per day
 fn group_modifications_by_date(logs: &[&LogEntry]) -> Vec<DailyModificationGroup> {
-    use chrono::{DateTime};
+    use chrono::DateTime;
     use std::collections::HashMap;
 
     let mut groups: HashMap<String, Vec<&LogEntry>> = HashMap::new();

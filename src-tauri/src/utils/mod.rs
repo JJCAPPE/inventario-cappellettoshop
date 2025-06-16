@@ -64,11 +64,6 @@ pub struct AppConfig {
     pub firebase_app_id: String,
     pub firebase_measurement_id: String,
 
-    // GitHub Auto-Updater Configuration
-    pub github_token: String,
-    pub github_owner: String,
-    pub github_repo: String,
-
     // App Configuration
     pub version: String,
 }
@@ -109,14 +104,6 @@ impl AppConfig {
         let firebase_measurement_id = std::env::var("FIREBASE_MEASUREMENT_ID")
             .map_err(|_| "FIREBASE_MEASUREMENT_ID must be set in .env file")?;
 
-        // GitHub Auto-Updater Configuration
-        let github_token =
-            std::env::var("GITHUB_TOKEN").map_err(|_| "GITHUB_TOKEN must be set in .env file")?;
-        let github_owner =
-            std::env::var("GITHUB_OWNER").map_err(|_| "GITHUB_OWNER must be set in .env file")?;
-        let github_repo =
-            std::env::var("GITHUB_REPO").map_err(|_| "GITHUB_REPO must be set in .env file")?;
-
         // App Configuration
         let version = std::env::var("VERSION").unwrap_or_else(|_| "3.0.0".to_string());
 
@@ -135,9 +122,6 @@ impl AppConfig {
             firebase_messaging_sender_id,
             firebase_app_id,
             firebase_measurement_id,
-            github_token,
-            github_owner,
-            github_repo,
             version,
         })
     }
@@ -167,14 +151,6 @@ impl AppConfig {
             measurement_id: self.firebase_measurement_id.clone(),
         }
     }
-
-    pub fn get_github_config(&self) -> GitHubConfig {
-        GitHubConfig {
-            token: self.github_token.clone(),
-            owner: self.github_owner.clone(),
-            repo: self.github_repo.clone(),
-        }
-    }
 }
 
 // ============================================================================
@@ -190,15 +166,4 @@ pub struct FirebaseConfig {
     pub messaging_sender_id: String,
     pub app_id: String,
     pub measurement_id: String,
-}
-
-// ============================================================================
-// GITHUB CONFIGURATION
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GitHubConfig {
-    pub token: String,
-    pub owner: String,
-    pub repo: String,
 }
