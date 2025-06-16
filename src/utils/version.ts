@@ -4,7 +4,7 @@
 
 /**
  * Get the current application version from VITE_VERSION environment variable
- * Falls back to "3.0.0" if not set
+ * Falls back to "3.0.1" if not set
  */
 export const getAppVersion = (): string => {
   return import.meta.env.VITE_VERSION;

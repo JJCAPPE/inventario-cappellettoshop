@@ -105,7 +105,7 @@ impl AppConfig {
             .map_err(|_| "FIREBASE_MEASUREMENT_ID must be set in .env file")?;
 
         // App Configuration
-        let version = std::env::var("VERSION").unwrap_or_else(|_| "3.0.0".to_string());
+        let version = std::env::var("VERSION").unwrap_or_else(|_| "3.0.1".to_string());
 
         Ok(AppConfig {
             shop_domain,

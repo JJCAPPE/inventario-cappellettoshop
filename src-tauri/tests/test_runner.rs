@@ -718,7 +718,7 @@ fn test_dry_run_all_functions() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.0.0".to_string(),
+        version: "3.0.1".to_string(),
     };
 
     // Test URL generation for all endpoints

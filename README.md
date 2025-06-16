@@ -1,6 +1,6 @@
 # 🏪 Inventario CappellettoShop
 
-A modern desktop inventory management application for Shopify stores, built with **Tauri**, **React**, and **TypeScript**. This application provides real-time inventory tracking, product search, and barcode scanning capabilities for retail store operations.
+A modern desktop inventory management application for Shopify stores, built with **Tauri**, **React**, and **TypeScript**. This application provides real-time inventory tracking, product search, barcode scanning, and automated update management for retail store operations.
 
 ## 📋 Table of Contents
 
@@ -10,6 +10,7 @@ A modern desktop inventory management application for Shopify stores, built with
 - [Project Structure](#-project-structure)
 - [Setup & Installation](#-setup--installation)
 - [Usage Guide](#-usage-guide)
+- [Auto-Update System](#-auto-update-system)
 - [API Integration](#-api-integration)
 - [Development Methodology](#-development-methodology)
 - [Configuration](#-configuration)
@@ -26,16 +27,42 @@ A modern desktop inventory management application for Shopify stores, built with
 - **Product Status Management**: Toggle products between draft and active status
 - **Change History**: Complete audit trail of all inventory modifications with timestamps
 
+### Check Requests System 🆕
+- **Quality Control Workflow**: Create and manage product check requests for quality assurance
+- **Request Tracking**: Monitor pending, in-progress, and completed check requests
+- **Status Management**: Update check request status with closing notes
+- **Firebase Integration**: All check requests stored and synchronized via Firebase Firestore
+- **Real-time Updates**: Live synchronization of check request status across the application
+
+### Auto-Update System 🆕
+- **Automatic Updates**: Seamless application updates with GitHub releases integration
+- **Smart Update Detection**: Intelligent checking every 30 minutes with visual feedback
+- **Update Status Indicators**: 
+  - 🔄 **Checking**: Shows download icon with "Controllo..." text
+  - ✅ **Up to Date**: Green checkmark icon (no text) when app is current
+  - 📥 **Update Available**: Download icon with update modal
+- **Persistent Update Management**: Updates remain available for installation even after closing modal
+- **Progress Tracking**: Real-time download and installation progress with detailed feedback
+- **Signed Updates**: Cryptographically signed updates for security and authenticity
+
 ### User Interface
 - **Modern Design**: Built with Ant Design components for a professional look
 - **Responsive Layout**: Optimized for desktop with mobile-friendly elements
 - **Real-time Updates**: Live inventory data with automatic refresh capabilities
-- **Keyboard Shortcuts**: Quick access to settings and frequently used functions
+- **Enhanced Navigation**: 
+  - Sidebar panels for recent changes and check requests
+  - Keyboard shortcuts for quick access
+  - Contextual tooltips and help text
+- **Visual Feedback**: 
+  - Color-coded status indicators
+  - Loading states and progress bars
+  - Success/error notifications with detailed messages
 - **Customizable Settings**: Configurable search sorting and location preferences
 
 ### Integration Capabilities
 - **Shopify API Integration**: Full integration with Shopify Admin API for product and inventory data
 - **Firebase Logging**: Comprehensive activity logging stored in Firebase Firestore
+- **GitHub Releases**: Automated update delivery through GitHub releases
 - **External Links**: Direct links to Shopify admin and store front for products
 
 ## 🏗 Architecture
@@ -100,11 +127,16 @@ inventario-cappellettoshop/
 │   │   ├── HomePage.tsx         # Main application interface
 │   │   ├── SearchBar.tsx        # Product search component
 │   │   ├── DataPage.tsx         # Recent changes panel
+│   │   ├── CheckRequestsPage.tsx # Check requests management 🆕
+│   │   ├── UpdateModal.tsx      # Auto-update modal 🆕
 │   │   └── StatisticsPage.tsx   # Analytics dashboard
 │   ├── contexts/                # React contexts
 │   │   └── LogContext.tsx       # Logging state management
 │   ├── services/                # API service layer
-│   │   └── tauri.ts            # Tauri command bindings
+│   │   ├── tauri.ts            # Tauri command bindings
+│   │   └── updater.ts          # Auto-update service 🆕
+│   ├── hooks/                   # Custom React hooks 🆕
+│   │   └── useUpdater.ts       # Update management hook 🆕
 │   ├── types/                   # TypeScript definitions
 │   │   └── index.ts            # Core data models
 │   └── App.tsx                 # Main application component
@@ -113,9 +145,13 @@ inventario-cappellettoshop/
 │   │   ├── main.rs            # Application entry point
 │   │   ├── commands/          # Tauri command handlers
 │   │   ├── services/          # External API clients
+│   │   ├── firebase/          # Firebase integration 🆕
+│   │   ├── utils/             # Configuration and utilities 🆕
 │   │   └── models/            # Data structures
 │   ├── Cargo.toml             # Rust dependencies
-│   └── tauri.conf.json        # Tauri configuration
+│   └── tauri.conf.json        # Tauri configuration (includes updater)
+├── .github/workflows/          # GitHub Actions 🆕
+│   └── release.yml            # Automated release workflow 🆕
 ├── public/                     # Static assets
 ├── dist/                       # Built frontend files
 └── package.json               # Node.js dependencies
@@ -168,6 +204,19 @@ FIREBASE_APP_ID=your_app_id
 # Store Locations
 LOCATION_TREVISO=location_id_1
 LOCATION_MOGLIANO=location_id_2
+
+# Tauri Auto-Update Signing (for builds only)
+TAURI_SIGNING_PRIVATE_KEY=your_private_signing_key
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD=your_key_password
+
+# Application Version
+VERSION=3.0.0
+VITE_VERSION=3.0.0
+```
+
+**Note**: The `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are only required for building signed releases. Generate these using:
+```bash
+npm run tauri signer generate -w ~/.tauri/myapp.key
 ```
 
 ### Development Commands
@@ -183,6 +232,14 @@ npm run tauri dev
 
 # Build Tauri application
 npm run tauri build
+
+# Build signed release (requires signing keys in environment)
+export TAURI_SIGNING_PRIVATE_KEY="your_private_key"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="your_password"
+npm run tauri build
+
+# Generate signing keys for updates
+npm run tauri signer generate -w ~/.tauri/myapp.key
 ```
 
 ## 📖 Usage Guide
@@ -209,8 +266,52 @@ npm run tauri build
    - Use the undo functionality to reverse recent modifications
    - All changes are logged with timestamps and details
 
+### Check Requests System 🆕
+
+1. **Creating Check Requests**:
+   - Navigate to any product page
+   - Click the "Richiedi Controllo" button to create a quality check request
+   - Requests are automatically logged with product details and timestamp
+
+2. **Managing Check Requests**:
+   - Click the "Richieste" button in the header to open the check requests panel
+   - View all pending, in-progress, and completed requests
+   - Filter and sort requests by status, date, or product
+
+3. **Processing Check Requests**:
+   - Click on any request to view details
+   - Update status from "pending" to "in_progress" to "completed"
+   - Add closing notes when marking requests as completed
+   - All changes are synchronized in real-time via Firebase
+
+### Auto-Update System 🆕
+
+1. **Automatic Update Checking**:
+   - App automatically checks for updates every 30 minutes
+   - Initial check performed when app starts
+   - Visual indicators show current update status
+
+2. **Update Status Indicators**:
+   - **🔄 Checking**: Download icon with "Controllo..." text during update checks
+   - **✅ Up to Date**: Green checkmark icon (no text) when app is current
+   - **📥 Update Available**: Download icon with "Aggiornamenti" text when updates found
+
+3. **Installing Updates**:
+   - Click "Aggiornamenti" button when updates are available
+   - Review update details and release notes in the modal
+   - Choose "Scarica e Installa" to download and install
+   - Monitor real-time progress during download and installation
+   - Restart app when prompted to complete the update
+
+4. **Update Management**:
+   - Updates remain available even after closing the modal
+   - Click "Aggiornamenti" button to reopen update modal
+   - Choose "Più tardi" to defer installation
+   - App will remind you to restart after successful installation
+
 ### Keyboard Shortcuts
 - **Cmd/Ctrl + ,**: Open settings modal
+- **Cmd/Ctrl + M**: Toggle recent changes panel
 - **Enter**: Submit search query
 - **Escape**: Close modals and clear selections
 
@@ -317,6 +418,62 @@ For technical support or questions about the inventory management system, please
 
 ---
 
-**Version**: 3.0.0  
-**Last Updated**: 2024  
+**Version**: 3.0.1  
+**Last Updated**: June 2025  
 **Built with** ❤️ **for CappellettoShop**
+
+## 🔄 Auto-Update System
+
+### Overview
+The application features a comprehensive auto-update system that ensures users always have the latest features and security updates. The system is built on top of Tauri's updater plugin with GitHub releases integration.
+
+### Key Features
+
+#### **Automatic Detection**
+- **Periodic Checks**: Automatically checks for updates every 30 minutes
+- **Startup Check**: Verifies for updates when the application starts
+- **Smart Scheduling**: Prevents overlapping update checks and rate limiting
+
+#### **Visual Status Indicators**
+- **🔄 Checking State**: Download icon with "Controllo..." text during active checks
+- **✅ Up-to-Date State**: Green checkmark icon (no text) when app is current
+- **📥 Update Available**: Download icon with "Aggiornamenti" text when updates are found
+
+#### **Secure Update Process**
+- **Cryptographic Signing**: All updates are cryptographically signed for security
+- **Signature Verification**: App verifies update authenticity before installation
+- **GitHub Releases**: Updates delivered through secure GitHub releases
+
+#### **User-Friendly Installation**
+- **Progress Tracking**: Real-time download and installation progress
+- **Detailed Feedback**: Comprehensive notifications and status messages
+- **Flexible Timing**: Users can defer installation or install immediately
+- **Persistent Availability**: Updates remain available even after closing modal
+
+### Update Workflow
+
+1. **Detection Phase**:
+   - App checks GitHub releases for newer versions
+   - Compares current version with latest available
+   - Updates UI indicators based on results
+
+2. **User Notification**:
+   - Modal appears automatically when updates are found
+   - Shows version information and release notes
+   - Provides clear installation options
+
+3. **Installation Phase**:
+   - Downloads update package with progress tracking
+   - Verifies cryptographic signature
+   - Installs update and prepares for restart
+
+4. **Completion**:
+   - Prompts user to restart application
+   - Preserves user data and settings
+   - Launches updated version after restart
+
+### Security Considerations
+- **Signed Updates**: All updates are signed with RSA keys for authenticity
+- **Secure Transport**: Downloads use HTTPS for secure transmission
+- **Verification**: App verifies signatures before any installation
+- **Public Repository**: Updates delivered through public GitHub releases for transparency

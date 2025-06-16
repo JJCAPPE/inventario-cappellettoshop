@@ -98,6 +98,7 @@ function App() {
     showUpdateModal,
     lastCheckFoundNoUpdate,
     checkForUpdates,
+    openUpdateModal,
     closeUpdateModal,
   } = useUpdater({
     checkOnMount: true, // Check for updates when app starts
@@ -120,6 +121,23 @@ function App() {
   const handleManualUpdateCheck = async () => {
     console.log("🔍 Manual update check triggered");
 
+    // If we already have an update available, just reopen the modal
+    if (update && !showUpdateModal) {
+      console.log(
+        "📋 Reopening update modal for existing update:",
+        update.version
+      );
+
+      openUpdateModal();
+
+      message.info({
+        content: `Aggiornamento alla versione ${update.version} ancora disponibile`,
+        duration: 3,
+      });
+
+      return;
+    }
+
     try {
       await checkForUpdates();
 
@@ -129,6 +147,14 @@ function App() {
           message.success({
             content: "La tua app è già aggiornata all'ultima versione",
             duration: 3,
+          });
+
+          notification.success({
+            message: "App Aggiornata",
+            description: "Stai già utilizzando l'ultima versione disponibile",
+            icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+            duration: 4,
+            placement: "topRight",
           });
         }
       }, 500);
@@ -333,7 +359,7 @@ function App() {
                 {isChecking
                   ? "Controllo..."
                   : lastCheckFoundNoUpdate
-                  ? "Aggiornata"
+                  ? ""
                   : "Aggiornamenti"}
               </Button>
 
