@@ -53,6 +53,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Install macOS dependencies
+        if: matrix.platform == 'macos-latest'
+        run: |
+          # Install create-dmg for DMG bundling
+          brew install create-dmg
+          # Ensure Xcode command line tools are available
+          sudo xcode-select --install || true
+          # Install additional required tools
+          brew install coreutils
+          # Print versions for debugging
+          echo "create-dmg version: $(create-dmg --version)"
+          echo "Xcode version: $(xcodebuild -version)"
+          echo "macOS version: $(sw_vers -productVersion)"
+
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
@@ -63,6 +77,29 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Debug build environment (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          echo "=== Build Environment Debug ==="
+          echo "Platform: ${{ matrix.platform }}"
+          echo "Args: ${{ matrix.args }}"
+          echo "Working directory: $(pwd)"
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "Rust version: $(rustc --version)"
+          echo "Cargo version: $(cargo --version)"
+          echo "Available Rust targets:"
+          rustup target list --installed
+          echo "Tauri CLI version:"
+          npx @tauri-apps/cli --version || echo "Tauri CLI not found"
+          echo "File structure:"
+          ls -la
+          echo "src-tauri structure:"
+          ls -la src-tauri/
+          echo "Tauri config:"
+          cat src-tauri/tauri.conf.json
+          echo "=== End Debug ==="
 
       - name: Extract version from package.json
         id: package_version
@@ -82,7 +119,7 @@ jobs:
           echo "VITE_BUILD_ENV=production" >> $GITHUB_ENV
 
       - name: Build and release Tauri app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.5.14
         env:
           # GitHub token for creating releases
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
