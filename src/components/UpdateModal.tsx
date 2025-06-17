@@ -8,17 +8,12 @@ import {
   Divider,
   Tag,
   message,
-  notification,
   Alert,
 } from "antd";
 import {
   DownloadOutlined,
-  ReloadOutlined,
   CloseOutlined,
-  CheckCircleOutlined,
   ExclamationCircleOutlined,
-  CloudDownloadOutlined,
-  RocketOutlined,
 } from "@ant-design/icons";
 import { Update } from "@tauri-apps/plugin-updater";
 import UpdaterService, { UpdateProgress } from "../services/updater";
@@ -77,11 +72,9 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
     setDownloadProgress(0);
     setDownloadedBytes(0);
 
-    // Show initial notification
-    notification.info({
-      message: "Aggiornamento Avviato",
-      description: `Inizio download della versione ${update.version}`,
-      icon: <CloudDownloadOutlined style={{ color: "#1890ff" }} />,
+    // Show initial toast
+    message.info({
+      content: `Inizio download della versione ${update.version}`,
       duration: 3,
     });
 
@@ -100,16 +93,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                     progress.data.contentLength
                   )})`,
                   duration: 2,
-                });
-
-                // Detailed notification for download start
-                notification.open({
-                  message: "Download Iniziato",
-                  description: `Scaricamento di ${formatBytes(
-                    progress.data.contentLength
-                  )} in corso...`,
-                  icon: <DownloadOutlined style={{ color: "#1890ff" }} />,
-                  duration: 3,
                 });
               }
               break;
@@ -138,12 +121,10 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                 duration: 3,
               });
 
-              // Detailed notification for download completion
-              notification.success({
-                message: "Download Completato",
-                description:
-                  "File scaricato con successo. Installazione dell'aggiornamento in corso...",
-                icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
+              // Toast for download completion detail
+              message.success({
+                content:
+                  "File scaricato con successo. Installazione in corso...",
                 duration: 4,
               });
 
@@ -157,14 +138,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
       message.success({
         content: "Aggiornamento installato con successo!",
         duration: 4,
-      });
-
-      notification.success({
-        message: "Aggiornamento Installato!",
-        description: `La versione ${update.version} è stata installata con successo. Riavvia l'applicazione per utilizzare la nuova versione.`,
-        icon: <RocketOutlined style={{ color: "#52c41a" }} />,
-        duration: 8,
-        placement: "topRight",
       });
 
       // Notify parent component
@@ -182,51 +155,15 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
         duration: 5,
       });
 
-      // Detailed error notification
-      notification.error({
-        message: "Errore Aggiornamento",
-        description: `Si è verificato un errore durante l'aggiornamento: ${errorMessage}`,
-        icon: <ExclamationCircleOutlined style={{ color: "#ff4d4f" }} />,
+      // Error toast
+      message.error({
+        content: `Errore durante l'aggiornamento: ${errorMessage}`,
         duration: 8,
-        placement: "topRight",
       });
 
       console.error("❌ Update failed:", err);
     } finally {
       setIsDownloading(false);
-    }
-  };
-
-  const handleRestartApp = async () => {
-    try {
-      // Show restart notification
-      notification.info({
-        message: "Riavvio in Corso",
-        description: "L'applicazione si sta riavviando...",
-        icon: <ReloadOutlined style={{ color: "#1890ff" }} />,
-        duration: 2,
-      });
-
-      // Small delay to show the notification
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      await UpdaterService.restartApp();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Errore nel riavvio";
-
-      message.error({
-        content: errorMessage,
-        duration: 4,
-      });
-
-      notification.error({
-        message: "Errore Riavvio",
-        description: errorMessage,
-        duration: 6,
-      });
-
-      console.error("❌ Restart failed:", err);
     }
   };
 
@@ -242,13 +179,10 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
 
       // Show reminder if update was completed but not restarted
       if (isCompleted && !error) {
-        notification.warning({
-          message: "Riavvio Necessario",
-          description:
-            "Ricorda di riavviare l'applicazione per utilizzare la nuova versione.",
-          icon: <ExclamationCircleOutlined style={{ color: "#faad14" }} />,
+        message.warning({
+          content:
+            "Ricorda di riavviare l'applicazione per utilizzare la nuova versione",
           duration: 8,
-          placement: "topRight",
         });
       }
     }
@@ -354,14 +288,35 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
 
         {/* Completion Message */}
         {isCompleted && !error && (
-          <Alert
-            message="Aggiornamento completato con successo!"
-            description="L'aggiornamento è stato installato. Riavvia l'applicazione per utilizzare la nuova versione."
-            type="success"
-            showIcon
-            icon={<CheckCircleOutlined />}
-            style={{ marginBottom: 16 }}
-          />
+          <div
+            style={{
+              marginBottom: 16,
+              padding: 16,
+              backgroundColor: "#f6ffed",
+              border: "1px solid #b7eb8f",
+              borderRadius: 6,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: "18px", marginBottom: "8px" }}>✅</div>
+            <Text
+              strong
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontSize: "16px",
+              }}
+            >
+              Aggiornamento Scaricato!
+            </Text>
+            <Text
+              type="secondary"
+              style={{ display: "block", fontSize: "14px" }}
+            >
+              L'aggiornamento alla versione {update.version} verrà installato
+              automaticamente al prossimo riavvio dell'applicazione.
+            </Text>
+          </div>
         )}
 
         {/* Action Buttons */}
@@ -387,23 +342,14 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
           )}
 
           {isCompleted && !error && (
-            <Space>
-              <Button
-                type="primary"
-                icon={<ReloadOutlined />}
-                onClick={handleRestartApp}
-                size="large"
-              >
-                Riavvia Ora
-              </Button>
-              <Button
-                icon={<CloseOutlined />}
-                onClick={handleClose}
-                size="large"
-              >
-                Riavvia Più Tardi
-              </Button>
-            </Space>
+            <Button
+              type="primary"
+              icon={<CloseOutlined />}
+              onClick={handleClose}
+              size="large"
+            >
+              Chiudi
+            </Button>
           )}
 
           {error && (

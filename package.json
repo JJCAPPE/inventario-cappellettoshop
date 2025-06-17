@@ -1,36 +1,36 @@
 {
-    "name": "Inventario CappellettoShop",
-    "private": true,
-    "version": "3.0.2",
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "tsc && vite build",
-        "preview": "vite preview",
-        "tauri": "tauri",
-        "version:sync": "node scripts/update-version.cjs",
-        "version:patch": "npm version patch --no-git-tag-version && npm run version:sync",
-        "version:minor": "npm version minor --no-git-tag-version && npm run version:sync",
-        "version:major": "npm version major --no-git-tag-version && npm run version:sync",
-        "version:set": "node scripts/update-version.cjs"
-    },
-    "dependencies": {
-        "@ant-design/icons": "^6.0.0",
-        "@tauri-apps/api": "^2.5.0",
-        "@tauri-apps/plugin-opener": "^2",
-        "@tauri-apps/plugin-process": "^2.2.1",
-        "@tauri-apps/plugin-updater": "^2.7.1",
-        "antd": "^5.25.3",
-        "dayjs": "^1.11.13",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1"
-    },
-    "devDependencies": {
-        "@tauri-apps/cli": "^2",
-        "@types/react": "^18.3.1",
-        "@types/react-dom": "^18.3.1",
-        "@vitejs/plugin-react": "^4.3.4",
-        "typescript": "~5.6.2",
-        "vite": "^6.0.3"
-    }
+  "name": "Inventario CappellettoShop",
+  "private": true,
+  "version": "3.0.5",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "version:sync": "node scripts/update-version.cjs",
+    "version:patch": "npm version patch --no-git-tag-version && npm run version:sync",
+    "version:minor": "npm version minor --no-git-tag-version && npm run version:sync",
+    "version:major": "npm version major --no-git-tag-version && npm run version:sync",
+    "version:set": "node scripts/update-version.cjs"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.0.0",
+    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.2.1",
+    "@tauri-apps/plugin-updater": "^2.7.1",
+    "antd": "^5.25.3",
+    "dayjs": "^1.11.13",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
+  }
 }

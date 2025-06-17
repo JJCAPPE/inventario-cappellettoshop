@@ -101,6 +101,7 @@ function App() {
 
   // New states for menu-triggered modals
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [triggerSettingsModal, setTriggerSettingsModal] = useState(false);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -128,12 +129,15 @@ function App() {
       // Listen for settings menu event
       await listen("show-settings", () => {
         console.log("📱 Settings menu triggered from native menu");
+        setShowAboutModal(false); // Close about modal if open
+        setShowSettingsModal(true);
         setTriggerSettingsModal(true);
       });
 
       // Listen for about menu event
       await listen("show-about", () => {
         console.log("ℹ️ About menu triggered from native menu");
+        setShowSettingsModal(false); // Close settings modal if open
         setShowAboutModal(true);
       });
     };
@@ -313,6 +317,7 @@ function App() {
         console.log(
           "⌨️ Keyboard shortcut triggered: Cmd+. - opening About modal"
         );
+        setShowSettingsModal(false); // Close settings modal if open
         setShowAboutModal(true);
       }
     };
@@ -354,6 +359,16 @@ function App() {
   // New function to handle about modal
   const handleAboutClose = () => {
     setShowAboutModal(false);
+  };
+
+  // Function to handle settings modal
+  const handleSettingsOpen = () => {
+    setShowAboutModal(false); // Close about modal if open
+    setShowSettingsModal(true);
+  };
+
+  const handleSettingsClose = () => {
+    setShowSettingsModal(false);
   };
 
   // Function to reset the settings trigger after HomePage handles it
@@ -492,6 +507,9 @@ function App() {
                 onTargetProductProcessed={() => setTargetProductId(null)}
                 triggerSettingsModal={triggerSettingsModal}
                 onSettingsTriggered={handleSettingsTriggered}
+                settingsModalVisible={showSettingsModal}
+                onSettingsOpen={handleSettingsOpen}
+                onSettingsClose={handleSettingsClose}
               />
 
               {/* Discrete version indicator at bottom center */}

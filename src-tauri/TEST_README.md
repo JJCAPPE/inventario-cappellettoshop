@@ -116,7 +116,7 @@ UPDATER_GITHUB_OWNER=your-github-username
 UPDATER_GITHUB_REPO=your-repo-name
 
 # App Version
-VERSION=3.0.2
+VERSION=3.0.5
 ```
 
 2. Run integration tests:

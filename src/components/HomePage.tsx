@@ -67,6 +67,9 @@ interface HomePageProps {
   onTargetProductProcessed?: () => void;
   triggerSettingsModal?: boolean;
   onSettingsTriggered?: () => void;
+  settingsModalVisible?: boolean;
+  onSettingsOpen?: () => void;
+  onSettingsClose?: () => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({
@@ -74,6 +77,9 @@ const HomePage: React.FC<HomePageProps> = ({
   onTargetProductProcessed,
   triggerSettingsModal,
   onSettingsTriggered,
+  settingsModalVisible,
+  onSettingsOpen,
+  onSettingsClose,
 }) => {
   const { fetchLogs } = useLogs();
   const [query, setQuery] = useState("");
@@ -92,7 +98,6 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastSelectedQuery, setLastSelectedQuery] = useState<string>("");
   const [modifyModalVisible, setModifyModalVisible] = useState(false);
   const [undoModalVisible, setUndoModalVisible] = useState(false);
-  const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [modificationHistoryModalVisible, setModificationHistoryModalVisible] =
     useState(false);
   const [checkRequestModalVisible, setCheckRequestModalVisible] =
@@ -139,7 +144,7 @@ const HomePage: React.FC<HomePageProps> = ({
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === ",") {
         event.preventDefault();
-        setSettingsModalVisible(true);
+        onSettingsOpen?.();
       }
     };
 
@@ -190,10 +195,10 @@ const HomePage: React.FC<HomePageProps> = ({
   useEffect(() => {
     if (triggerSettingsModal) {
       console.log("⚙️ HomePage: Opening settings modal from native menu");
-      setSettingsModalVisible(true);
+      onSettingsOpen?.();
       onSettingsTriggered?.(); // Reset the trigger
     }
-  }, [triggerSettingsModal, onSettingsTriggered]);
+  }, [triggerSettingsModal, onSettingsTriggered, onSettingsOpen]);
 
   const handleLocationChange = (newPrimaryLocation: string) => {
     if (LOCATION_CONFIG.isValidLocation(newPrimaryLocation)) {
@@ -242,7 +247,7 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleSettingsOk = () => {
-    setSettingsModalVisible(false);
+    onSettingsClose?.();
   };
 
   const handleSearchSelect = async (id: string, searchQuery: string) => {
@@ -1269,7 +1274,7 @@ const HomePage: React.FC<HomePageProps> = ({
         }
         open={settingsModalVisible}
         onOk={handleSettingsOk}
-        onCancel={() => setSettingsModalVisible(false)}
+        onCancel={() => onSettingsClose?.()}
         okText="Salva"
         cancelText="Annulla"
         width={500}
