@@ -1882,7 +1882,7 @@ dependencies = [
 
 [[package]]
 name = "inventario-cappellettoshop"
-version = "3.0.2"
+version = "3.0.3"
 dependencies = [
  "chrono",
  "dotenvy",
