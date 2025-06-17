@@ -24,7 +24,7 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 interface CheckRequestActionModalProps {
-  visible: boolean;
+  open: boolean;
   onClose: () => void;
   checkRequest: CheckRequest;
   onRequestUpdated: () => void;
@@ -32,7 +32,7 @@ interface CheckRequestActionModalProps {
 }
 
 const CheckRequestActionModal: React.FC<CheckRequestActionModalProps> = ({
-  visible,
+  open,
   onClose,
   checkRequest,
   onRequestUpdated,
@@ -121,7 +121,7 @@ const CheckRequestActionModal: React.FC<CheckRequestActionModalProps> = ({
           <span>Gestione Controllo Inventario</span>
         </Space>
       }
-      open={visible}
+      open={open}
       onCancel={handleCancel}
       footer={[
         <Button key="cancel" onClick={handleCancel}>

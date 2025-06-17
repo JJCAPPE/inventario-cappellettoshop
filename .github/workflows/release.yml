@@ -3,12 +3,12 @@ name: "Release"
 # Trigger on push to main branch or manual dispatch
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:
-  publish-tauri:
+  release:
     permissions:
       contents: write
     strategy:
@@ -18,17 +18,11 @@ jobs:
           # macOS builds
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
           # Windows builds
           - platform: "windows-latest"
-            args: "--target x86_64-pc-windows-msvc"
-            target: "x86_64-pc-windows-msvc"
-          - platform: "windows-latest"
-            args: "--target i686-pc-windows-msvc"
-            target: "i686-pc-windows-msvc"
+          - platform: "ubuntu-22.04"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -37,10 +31,10 @@ jobs:
 
       # Windows x86 specific setup
       - name: Install x86 Rust toolchain (Windows only)
-        if: matrix.target == 'i686-pc-windows-msvc'
+        if: matrix.platform == 'windows-latest'
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: i686-pc-windows-msvc
+          targets: x86_64-pc-windows-msvc
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,7 +45,13 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || matrix.target }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -63,6 +63,21 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Extract version from package.json
+        id: package_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VITE_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set build information
+        run: |
+          echo "VITE_BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
+          echo "VITE_BUILD_TIME=$(date -u +%H:%M:%S)" >> $GITHUB_ENV
+          echo "VITE_COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "VITE_BUILD_ENV=production" >> $GITHUB_ENV
 
       - name: Build and release Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -89,13 +104,19 @@ jobs:
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
-          VERSION: ${{ secrets.VERSION }}
-          VITE_VERSION: ${{ secrets.VITE_VERSION }}
+          # Version automatically extracted from package.json
+          VERSION: ${{ env.VERSION }}
+          VITE_VERSION: ${{ env.VITE_VERSION }}
+          # Build information (automatically set)
+          VITE_BUILD_DATE: ${{ env.VITE_BUILD_DATE }}
+          VITE_BUILD_TIME: ${{ env.VITE_BUILD_TIME }}
+          VITE_COMMIT_HASH: ${{ env.VITE_COMMIT_HASH }}
+          VITE_BUILD_ENV: ${{ env.VITE_BUILD_ENV }}
           OFFLINE_DEVELOPMENT: "false"
         with:
-          # Release configuration
-          tagName: "v__VERSION__"
-          releaseName: "Inventario Cappelletto v__VERSION__"
+          # Release configuration - using dynamic version
+          tagName: "v${{ steps.package_version.outputs.version }}"
+          releaseName: "Inventario Cappelletto v${{ steps.package_version.outputs.version }}"
           releaseBody: "See the assets to download and install this version."
           releaseDraft: false
           prerelease: false

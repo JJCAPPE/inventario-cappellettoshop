@@ -24,7 +24,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 interface CheckRequestModalProps {
-  visible: boolean;
+  open: boolean;
   onClose: () => void;
   productDetails: ProductDetails;
   selectedVariant?: string | null;
@@ -42,7 +42,7 @@ interface CheckRequestFormData {
 }
 
 const CheckRequestModal: React.FC<CheckRequestModalProps> = ({
-  visible,
+  open,
   onClose,
   productDetails,
   selectedVariant,
@@ -54,11 +54,11 @@ const CheckRequestModal: React.FC<CheckRequestModalProps> = ({
 
   // Reset checkAll state when modal opens/closes
   useEffect(() => {
-    if (visible) {
+    if (open) {
       // Reset checkAll state when modal opens
       setCheckAll(false);
     }
-  }, [visible]);
+  }, [open]);
 
   const handleSubmit = async (values: CheckRequestFormData) => {
     try {
@@ -140,7 +140,7 @@ const CheckRequestModal: React.FC<CheckRequestModalProps> = ({
           <span>Richiesta Controllo Inventario</span>
         </Space>
       }
-      open={visible}
+      open={open}
       onCancel={handleCancel}
       onOk={form.submit}
       okText="Crea Richiesta"

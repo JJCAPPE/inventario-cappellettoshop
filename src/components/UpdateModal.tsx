@@ -26,14 +26,14 @@ import UpdaterService, { UpdateProgress } from "../services/updater";
 const { Title, Text } = Typography;
 
 interface UpdateModalProps {
-  visible: boolean;
+  open: boolean;
   update: Update | null;
   onClose: () => void;
   onUpdateCompleted?: () => void;
 }
 
 const UpdateModal: React.FC<UpdateModalProps> = ({
-  visible,
+  open,
   update,
   onClose,
   onUpdateCompleted,
@@ -264,7 +264,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
           Aggiornamento Disponibile
         </Space>
       }
-      open={visible}
+      open={open}
       onCancel={handleClose}
       footer={null}
       closable={!isDownloading}

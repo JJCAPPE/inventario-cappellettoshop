@@ -65,11 +65,15 @@ const LOCATION_CONFIG = {
 interface HomePageProps {
   targetProductId?: string | null;
   onTargetProductProcessed?: () => void;
+  triggerSettingsModal?: boolean;
+  onSettingsTriggered?: () => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({
   targetProductId,
   onTargetProductProcessed,
+  triggerSettingsModal,
+  onSettingsTriggered,
 }) => {
   const { fetchLogs } = useLogs();
   const [query, setQuery] = useState("");
@@ -181,6 +185,15 @@ const HomePage: React.FC<HomePageProps> = ({
         });
     }
   }, [targetProductId, onTargetProductProcessed]);
+
+  // Handle settings modal trigger from native menu
+  useEffect(() => {
+    if (triggerSettingsModal) {
+      console.log("⚙️ HomePage: Opening settings modal from native menu");
+      setSettingsModalVisible(true);
+      onSettingsTriggered?.(); // Reset the trigger
+    }
+  }, [triggerSettingsModal, onSettingsTriggered]);
 
   const handleLocationChange = (newPrimaryLocation: string) => {
     if (LOCATION_CONFIG.isValidLocation(newPrimaryLocation)) {
@@ -1227,7 +1240,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Modification History Modal */}
       {productDetails && (
         <ModificationHistoryModal
-          visible={modificationHistoryModalVisible}
+          open={modificationHistoryModalVisible}
           onClose={() => setModificationHistoryModalVisible(false)}
           productId={productDetails.id}
           productName={productDetails.nomeArticolo}
@@ -1238,7 +1251,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Check Request Modal */}
       {productDetails && (
         <CheckRequestModal
-          visible={checkRequestModalVisible}
+          open={checkRequestModalVisible}
           onClose={() => setCheckRequestModalVisible(false)}
           productDetails={productDetails}
           selectedVariant={selectedVariant}

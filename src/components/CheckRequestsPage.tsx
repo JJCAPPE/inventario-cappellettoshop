@@ -492,7 +492,7 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
       {/* Action Modal */}
       {selectedRequest && (
         <CheckRequestActionModal
-          visible={actionModalVisible}
+          open={actionModalVisible}
           onClose={() => {
             setActionModalVisible(false);
             setSelectedRequest(null);

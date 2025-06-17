@@ -65,7 +65,7 @@ const NetChangeTag: React.FC<{
 };
 
 interface ModificationHistoryModalProps {
-  visible: boolean;
+  open: boolean;
   onClose: () => void;
   productId: string;
   productName: string;
@@ -82,7 +82,7 @@ const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
 ];
 
 const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
-  visible,
+  open,
   onClose,
   productId,
   productName,
@@ -119,10 +119,10 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
 
   // Load data when modal opens or time range changes
   useEffect(() => {
-    if (visible && productId) {
+    if (open && productId) {
       fetchModificationHistory(selectedTimeRange);
     }
-  }, [visible, productId, selectedTimeRange, primaryLocation]);
+  }, [open, productId, selectedTimeRange, primaryLocation]);
 
   // Handle time range change
   const handleTimeRangeChange = (value: number) => {
@@ -335,7 +335,7 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
             <span>Cronologia Modifiche</span>
           </Space>
         }
-        open={visible}
+        open={open}
         onCancel={handleClose}
         footer={null}
         width={900}
