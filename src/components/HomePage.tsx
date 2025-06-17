@@ -65,11 +65,15 @@ const LOCATION_CONFIG = {
 interface HomePageProps {
   targetProductId?: string | null;
   onTargetProductProcessed?: () => void;
+  triggerSettingsModal?: boolean;
+  onSettingsTriggered?: () => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({
   targetProductId,
   onTargetProductProcessed,
+  triggerSettingsModal,
+  onSettingsTriggered,
 }) => {
   const { fetchLogs } = useLogs();
   const [query, setQuery] = useState("");
@@ -181,6 +185,15 @@ const HomePage: React.FC<HomePageProps> = ({
         });
     }
   }, [targetProductId, onTargetProductProcessed]);
+
+  // Handle settings modal trigger from native menu
+  useEffect(() => {
+    if (triggerSettingsModal) {
+      console.log("⚙️ HomePage: Opening settings modal from native menu");
+      setSettingsModalVisible(true);
+      onSettingsTriggered?.(); // Reset the trigger
+    }
+  }, [triggerSettingsModal, onSettingsTriggered]);
 
   const handleLocationChange = (newPrimaryLocation: string) => {
     if (LOCATION_CONFIG.isValidLocation(newPrimaryLocation)) {

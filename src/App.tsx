@@ -6,6 +6,7 @@ import {
   ConfigProvider,
   notification,
   message,
+  Modal,
 } from "antd";
 
 import {
@@ -14,6 +15,7 @@ import {
   CheckCircleOutlined,
   DownloadOutlined,
   RocketOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
 import DataPage from "./components/DataPage";
@@ -22,7 +24,14 @@ import StatisticsPage from "./components/StatisticsPage";
 import UpdateModal from "./components/UpdateModal";
 import { LogProvider } from "./contexts/LogContext";
 import { useUpdater } from "./hooks/useUpdater";
-import { getDisplayVersion } from "./utils/version";
+import {
+  getDisplayVersion,
+  getBuildInfo,
+  getCommitHash,
+  isDevelopmentVersion,
+} from "./utils/version";
+import { getPrimaryLocationName } from "./utils/location";
+import { listen } from "@tauri-apps/api/event";
 import "antd/dist/reset.css";
 import "./App.css";
 
@@ -89,6 +98,11 @@ function App() {
   const [currentView, setCurrentView] = useState<SidebarView>("data");
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [targetProductId, setTargetProductId] = useState<string | null>(null);
+
+  // New states for menu-triggered modals
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [triggerSettingsModal, setTriggerSettingsModal] = useState(false);
+
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Initialize updater with configuration
@@ -108,6 +122,23 @@ function App() {
 
   useEffect(() => {
     document.title = `Inventario CappellettoShop ${getDisplayVersion()}`;
+
+    // Set up menu event listeners
+    const setupMenuListeners = async () => {
+      // Listen for settings menu event
+      await listen("show-settings", () => {
+        console.log("📱 Settings menu triggered from native menu");
+        setTriggerSettingsModal(true);
+      });
+
+      // Listen for about menu event
+      await listen("show-about", () => {
+        console.log("ℹ️ About menu triggered from native menu");
+        setShowAboutModal(true);
+      });
+    };
+
+    setupMenuListeners().catch(console.error);
   }, []);
 
   // Function to handle navigation to a specific product
@@ -255,7 +286,7 @@ function App() {
     };
   }, [sidebarVisible]);
 
-  // Keyboard shortcut for toggling logs panel (Cmd+M)
+  // Keyboard shortcut for toggling logs panel (Cmd+M) and About modal (Cmd+.)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check for Cmd+M (metaKey is Cmd on Mac, ctrlKey on Windows/Linux)
@@ -265,6 +296,24 @@ function App() {
           "⌨️ Keyboard shortcut triggered: Cmd+M - toggling logs panel"
         );
         handleDataPanelToggle(event as any); // Cast to React.MouseEvent for compatibility
+      }
+
+      // Check for Cmd+R to toggle controlli (check requests) panel
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
+        event.preventDefault(); // Prevent default browser behavior
+        console.log(
+          "⌨️ Keyboard shortcut triggered: Cmd+R - toggling controlli panel"
+        );
+        handleCheckRequestsPanelToggle(event as any); // Cast to React.MouseEvent for compatibility
+      }
+
+      // Check for Cmd+. (Command+Period) to open About modal
+      if ((event.metaKey || event.ctrlKey) && event.key === ".") {
+        event.preventDefault(); // Prevent default browser behavior
+        console.log(
+          "⌨️ Keyboard shortcut triggered: Cmd+. - opening About modal"
+        );
+        setShowAboutModal(true);
       }
     };
 
@@ -300,6 +349,16 @@ function App() {
       default:
         return "Modifiche";
     }
+  };
+
+  // New function to handle about modal
+  const handleAboutClose = () => {
+    setShowAboutModal(false);
+  };
+
+  // Function to reset the settings trigger after HomePage handles it
+  const handleSettingsTriggered = () => {
+    setTriggerSettingsModal(false);
   };
 
   return (
@@ -431,6 +490,8 @@ function App() {
               <HomePage
                 targetProductId={targetProductId}
                 onTargetProductProcessed={() => setTargetProductId(null)}
+                triggerSettingsModal={triggerSettingsModal}
+                onSettingsTriggered={handleSettingsTriggered}
               />
 
               {/* Discrete version indicator at bottom center */}
@@ -512,6 +573,125 @@ function App() {
             onClose={closeUpdateModal}
             onUpdateCompleted={handleUpdateCompleted}
           />
+
+          {/* About Modal */}
+          <Modal
+            title={
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <InfoCircleOutlined />
+                Informazioni
+              </div>
+            }
+            open={showAboutModal}
+            onCancel={handleAboutClose}
+            footer={[
+              <Button key="close" type="primary" onClick={handleAboutClose}>
+                Chiudi
+              </Button>,
+            ]}
+            width={600}
+          >
+            <div style={{ padding: "16px 0", textAlign: "center" }}>
+              <div style={{ fontSize: "24px", marginBottom: "16px" }}>🏪</div>
+              <h2 style={{ marginBottom: "8px" }}>
+                Inventario CappellettoShop
+              </h2>
+              <p style={{ color: "#666", marginBottom: "16px" }}>
+                Versione {getDisplayVersion()}
+                {isDevelopmentVersion() && (
+                  <span style={{ color: "#f5a623", marginLeft: "8px" }}>
+                    🚧 Dev
+                  </span>
+                )}
+              </p>
+
+              {/* Primary Location Indicator */}
+              <div
+                style={{
+                  padding: "16px",
+                  backgroundColor: "#e6f7ff",
+                  border: "2px solid #1890ff",
+                  borderRadius: "8px",
+                  marginBottom: "24px",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    color: "#1890ff",
+                    marginBottom: "4px",
+                  }}
+                >
+                  📍 POSIZIONE SELEZIONATA
+                </div>
+                <div
+                  style={{
+                    fontSize: "24px",
+                    fontWeight: "bold",
+                    color: "#1890ff",
+                  }}
+                >
+                  {getPrimaryLocationName().toUpperCase()}
+                </div>
+              </div>
+
+              {/* Build Information */}
+              <div
+                style={{
+                  padding: "12px",
+                  backgroundColor: "#f9f9f9",
+                  borderRadius: "6px",
+                  marginBottom: "24px",
+                  fontSize: "12px",
+                  color: "#666",
+                }}
+              >
+                <div style={{ marginBottom: "4px" }}>
+                  <strong>Build:</strong> {getBuildInfo()}
+                </div>
+                <div>
+                  <strong>Commit:</strong> {getCommitHash()}
+                </div>
+              </div>
+
+              <div style={{ textAlign: "left", marginBottom: "24px" }}>
+                <p>
+                  <strong>📦 Gestione Inventario</strong>
+                </p>
+                <p style={{ marginLeft: "20px", color: "#666" }}>
+                  Sistema completo per la gestione dell'inventario del negozio,
+                  con sincronizzazione in tempo reale con Shopify.
+                </p>
+
+                <p>
+                  <strong>🔄 Funzionalità Principali</strong>
+                </p>
+                <div style={{ marginLeft: "20px", color: "#666" }}>
+                  <p>• Ricerca prodotti per SKU e nome</p>
+                  <p>• Aggiornamento quantità inventario</p>
+                  <p>• Gestione richieste di controllo</p>
+                  <p>• Logging completo delle modifiche</p>
+                  <p>• Auto-aggiornamenti</p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "12px",
+                  backgroundColor: "#f6f6f6",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  color: "#666",
+                }}
+              >
+                Sviluppato con ❤️ per CappellettoShop
+              </div>
+            </div>
+          </Modal>
         </Layout>
       </ConfigProvider>
     </LogProvider>
