@@ -36,7 +36,7 @@ fn test_config_api_url_generation() {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "2025-01".to_string(),
+        api_version: "3.0.2".to_string(),
         primary_location: "loc1".to_string(),
         secondary_location: "loc2".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -46,7 +46,7 @@ fn test_config_api_url_generation() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.0.1".to_string(),
+        version: "3.0.2".to_string(),
     };
 
     let url = config.get_api_url("products.json");
@@ -63,7 +63,7 @@ fn test_config_headers() {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "2025-01".to_string(),
+        api_version: "3.0.2".to_string(),
         primary_location: "loc1".to_string(),
         secondary_location: "loc2".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -73,7 +73,7 @@ fn test_config_headers() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.0.1".to_string(),
+        version: "3.0.2".to_string(),
     };
 
     let headers = config.get_headers();
@@ -248,7 +248,7 @@ fn setup_test_config() -> AppConfig {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "2025-01".to_string(),
+        api_version: "3.0.2".to_string(),
         primary_location: "12345".to_string(),
         secondary_location: "67890".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -258,7 +258,7 @@ fn setup_test_config() -> AppConfig {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.0.1".to_string(),
+        version: "3.0.2".to_string(),
     }
 }
 
@@ -384,7 +384,7 @@ fn test_config_validation() {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "2025-01".to_string(),
+        api_version: "3.0.2".to_string(),
         primary_location: "loc1".to_string(),
         secondary_location: "loc2".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -394,7 +394,7 @@ fn test_config_validation() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.0.1".to_string(),
+        version: "3.0.2".to_string(),
     };
 
     // Test that all fields are properly set
@@ -497,7 +497,7 @@ impl Default for TestVariant {
             old_inventory_quantity: 5,
             requires_shipping: true,
             admin_graphql_api_id: format!("gid://shopify/ProductVariant/{}", TEST_VARIANT_ID),
-            version: "3.0.1".to_string(),
+            version: "3.0.2".to_string(),
         }
     }
 }
@@ -541,7 +541,7 @@ impl Default for TestImage {
             src: "https://cdn.shopify.com/test-image.jpg".to_string(),
             variant_ids: vec![TEST_VARIANT_ID.to_string()],
             admin_graphql_api_id: "gid://shopify/ProductImage/1234567890".to_string(),
-            version: "3.0.1".to_string(),
+            version: "3.0.2".to_string(),
         }
     }
 }
@@ -1042,7 +1042,7 @@ fn test_missing_required_config_fields() {
                 access_token: "test-token".to_string(),
                 api_key: "test-key".to_string(),
                 api_secret: "test-secret".to_string(),
-                api_version: "2025-01".to_string(),
+                api_version: "3.0.2".to_string(),
                 primary_location: "loc1".to_string(),
                 secondary_location: "loc2".to_string(),
                 firebase_api_key: "test-firebase-key".to_string(),
@@ -1052,7 +1052,7 @@ fn test_missing_required_config_fields() {
                 firebase_messaging_sender_id: "123456".to_string(),
                 firebase_app_id: "1:123456:web:abc123".to_string(),
                 firebase_measurement_id: "G-ABC123".to_string(),
-                version: "3.0.1".to_string(),
+                version: "3.0.2".to_string(),
             },
             "shop_domain should not be empty",
         ),
@@ -1063,7 +1063,7 @@ fn test_missing_required_config_fields() {
                 access_token: "".to_string(),
                 api_key: "test-key".to_string(),
                 api_secret: "test-secret".to_string(),
-                api_version: "2025-01".to_string(),
+                api_version: "3.0.2".to_string(),
                 primary_location: "loc1".to_string(),
                 secondary_location: "loc2".to_string(),
                 firebase_api_key: "test-firebase-key".to_string(),
@@ -1073,7 +1073,7 @@ fn test_missing_required_config_fields() {
                 firebase_messaging_sender_id: "123456".to_string(),
                 firebase_app_id: "1:123456:web:abc123".to_string(),
                 firebase_measurement_id: "G-ABC123".to_string(),
-                version: "3.0.1".to_string(),
+                version: "3.0.2".to_string(),
             },
             "access_token should not be empty",
         ),
