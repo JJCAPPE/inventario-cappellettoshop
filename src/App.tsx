@@ -1,20 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Layout,
-  Button,
-  Drawer,
-  ConfigProvider,
-  notification,
-  message,
-  Modal,
-} from "antd";
+import { Layout, Button, Drawer, ConfigProvider, message, Modal } from "antd";
 
 import {
   DatabaseOutlined,
   CloseOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
-  RocketOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
@@ -188,15 +179,8 @@ function App() {
           : "Errore nel controllo aggiornamenti";
 
       message.error({
-        content: errorMessage,
+        content: `Errore controllo aggiornamenti: ${errorMessage}`,
         duration: 4,
-      });
-
-      notification.error({
-        message: "Errore Controllo Aggiornamenti",
-        description: errorMessage,
-        duration: 6,
-        placement: "topRight",
       });
     }
   };
@@ -205,14 +189,11 @@ function App() {
   const handleUpdateCompleted = () => {
     console.log("✅ Update completed successfully from App component");
 
-    // Show celebration notification
-    notification.success({
-      message: "🎉 Aggiornamento Completato!",
-      description:
-        "L'applicazione è stata aggiornata con successo. Tutte le nuove funzionalità sono ora disponibili!",
-      icon: <RocketOutlined style={{ color: "#52c41a" }} />,
-      duration: 10,
-      placement: "topRight",
+    // Show celebration toast
+    message.success({
+      content:
+        "🎉 Aggiornamento completato! Tutte le nuove funzionalità sono ora disponibili!",
+      duration: 5,
     });
   };
 
