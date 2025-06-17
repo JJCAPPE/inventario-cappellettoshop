@@ -148,14 +148,6 @@ function App() {
             content: "La tua app è già aggiornata all'ultima versione",
             duration: 3,
           });
-
-          notification.success({
-            message: "App Aggiornata",
-            description: "Stai già utilizzando l'ultima versione disponibile",
-            icon: <CheckCircleOutlined style={{ color: "#52c41a" }} />,
-            duration: 4,
-            placement: "topRight",
-          });
         }
       }, 500);
     } catch (error) {
