@@ -66,6 +66,7 @@ jobs:
 
       - name: Extract version from package.json
         id: package_version
+        shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
@@ -73,6 +74,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set build information
+        shell: bash
         run: |
           echo "VITE_BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
           echo "VITE_BUILD_TIME=$(date -u +%H:%M:%S)" >> $GITHUB_ENV
