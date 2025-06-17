@@ -517,9 +517,9 @@ function App() {
               title={getSidebarTitle()}
               placement="right"
               onClose={() => setSidebarVisible(false)}
-              visible={sidebarVisible && window.innerWidth < 1200}
+              open={sidebarVisible && window.innerWidth < 1200}
               width={500}
-              bodyStyle={{ padding: 0 }}
+              styles={{ body: { padding: 0 } }}
             >
               {renderSidebarContent()}
             </Drawer>
@@ -568,7 +568,7 @@ function App() {
 
           {/* Update Modal */}
           <UpdateModal
-            visible={showUpdateModal}
+            open={showUpdateModal}
             update={update}
             onClose={closeUpdateModal}
             onUpdateCompleted={handleUpdateCompleted}

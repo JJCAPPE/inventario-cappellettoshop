@@ -207,14 +207,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
       onSearch={setQuery}
       value={query}
       listHeight={600}
-      dropdownMatchSelectWidth={true}
-      dropdownStyle={{
-        maxHeight: "600px",
-        minHeight: "200px",
-        overflowY: "auto",
-        zIndex: 1050,
-      }}
-      popupClassName="search-dropdown-large"
+      popupMatchSelectWidth={true}
+      classNames={{ popup: { root: "search-dropdown-large" } }}
     >
       <Input
         size="large"

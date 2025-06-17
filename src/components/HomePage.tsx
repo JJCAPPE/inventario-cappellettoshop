@@ -1240,7 +1240,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Modification History Modal */}
       {productDetails && (
         <ModificationHistoryModal
-          visible={modificationHistoryModalVisible}
+          open={modificationHistoryModalVisible}
           onClose={() => setModificationHistoryModalVisible(false)}
           productId={productDetails.id}
           productName={productDetails.nomeArticolo}
@@ -1251,7 +1251,7 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Check Request Modal */}
       {productDetails && (
         <CheckRequestModal
-          visible={checkRequestModalVisible}
+          open={checkRequestModalVisible}
           onClose={() => setCheckRequestModalVisible(false)}
           productDetails={productDetails}
           selectedVariant={selectedVariant}
