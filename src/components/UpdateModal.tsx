@@ -9,11 +9,7 @@ import {
   Tag,
   message,
 } from "antd";
-import {
-  DownloadOutlined,
-  ReloadOutlined,
-  CloseOutlined,
-} from "@ant-design/icons";
+import { DownloadOutlined, CloseOutlined } from "@ant-design/icons";
 import { Update } from "@tauri-apps/plugin-updater";
 import UpdaterService, { UpdateProgress } from "../services/updater";
 
@@ -153,31 +149,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
     }
   };
 
-  const handleRestartApp = async () => {
-    try {
-      // Show restart toast
-      message.info({
-        content: "Riavvio in corso...",
-        duration: 2,
-      });
-
-      // Small delay to show the message
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      await UpdaterService.restartApp();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Errore nel riavvio";
-
-      console.error("❌ Restart failed:", err);
-
-      message.error({
-        content: `Errore nel riavvio: ${errorMessage}`,
-        duration: 4,
-      });
-    }
-  };
-
   const handleClose = () => {
     if (!isDownloading) {
       onClose();
@@ -306,15 +277,30 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
           <div
             style={{
               marginBottom: 16,
-              padding: 12,
+              padding: 16,
               backgroundColor: "#f6ffed",
               border: "1px solid #b7eb8f",
               borderRadius: 6,
+              textAlign: "center",
             }}
           >
-            <Text type="success">
-              ✅ Aggiornamento completato! Riavvia l'applicazione per utilizzare
-              la nuova versione.
+            <div style={{ fontSize: "18px", marginBottom: "8px" }}>✅</div>
+            <Text
+              strong
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontSize: "16px",
+              }}
+            >
+              Aggiornamento Scaricato!
+            </Text>
+            <Text
+              type="secondary"
+              style={{ display: "block", fontSize: "14px" }}
+            >
+              L'aggiornamento alla versione {update.version} verrà installato
+              automaticamente al prossimo riavvio dell'applicazione.
             </Text>
           </div>
         )}
@@ -342,23 +328,14 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
           )}
 
           {isCompleted && !error && (
-            <Space>
-              <Button
-                type="primary"
-                icon={<ReloadOutlined />}
-                onClick={handleRestartApp}
-                size="large"
-              >
-                Riavvia Ora
-              </Button>
-              <Button
-                icon={<CloseOutlined />}
-                onClick={handleClose}
-                size="large"
-              >
-                Riavvia Più Tardi
-              </Button>
-            </Space>
+            <Button
+              type="primary"
+              icon={<CloseOutlined />}
+              onClick={handleClose}
+              size="large"
+            >
+              Chiudi
+            </Button>
           )}
 
           {error && (

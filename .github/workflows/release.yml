@@ -81,6 +81,19 @@ jobs:
           echo "VITE_COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "VITE_BUILD_ENV=production" >> $GITHUB_ENV
 
+      # Add debugging for macOS builds and install dependencies
+      - name: Setup macOS environment (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          echo "=== macOS Debug Info ==="
+          sw_vers
+          xcode-select -p
+          which create-dmg || echo "create-dmg not found"
+          ls -la /usr/bin/ | grep hdiutil || echo "hdiutil not found in /usr/bin/"
+          echo "=== Installing create-dmg ==="
+          brew install create-dmg || echo "Failed to install create-dmg"
+          echo "=== End Setup ==="
+
       - name: Build and release Tauri app
         uses: tauri-apps/tauri-action@v0
         env:

@@ -70,7 +70,7 @@ fn create_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
+        // .plugin(tauri_plugin_process::init()) // Temporarily disabled for debugging
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // Initialize app configuration from environment

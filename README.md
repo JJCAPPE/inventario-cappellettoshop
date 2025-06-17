@@ -210,8 +210,8 @@ TAURI_SIGNING_PRIVATE_KEY=your_private_signing_key
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD=your_key_password
 
 # Application Version
-VERSION=3.0.3
-VITE_VERSION=3.0.3
+VERSION=3.0.4
+VITE_VERSION=3.0.4
 ```
 
 **Note**: The `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are only required for building signed releases. Generate these using:
@@ -418,7 +418,7 @@ For technical support or questions about the inventory management system, please
 
 ---
 
-**Version**: 3.0.3  
+**Version**: 3.0.4  
 **Last Updated**: June 2025  
 **Built with** ❤️ **for CappellettoShop**
 
