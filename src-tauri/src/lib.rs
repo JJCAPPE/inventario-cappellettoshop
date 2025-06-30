@@ -6,6 +6,7 @@ pub mod inventory;
 pub mod location;
 pub mod products;
 pub mod status;
+pub mod stock;
 pub mod utils;
 
 // Re-export commonly used types for convenience
