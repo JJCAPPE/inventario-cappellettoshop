@@ -87,6 +87,14 @@ export interface StatusResponse {
   message: string;
 }
 
+// Enhanced status response that includes product status change information
+export interface EnhancedStatusResponse {
+  status: string;
+  message: string;
+  status_changed?: string; // "to_draft", "to_active", or undefined
+  product_status?: string; // Current product status ("draft", "active", etc.)
+}
+
 export interface SearchProductsResponse {
   products: Product[];
   total_count: number;

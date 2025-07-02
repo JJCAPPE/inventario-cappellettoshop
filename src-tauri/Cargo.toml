@@ -1,9 +1,10 @@
 [package]
 name = "inventario-cappellettoshop"
 version = "3.0.5"
-description = "A Tauri App"
+description = "Inventory management system for CappellettoShop"
 authors = ["you"]
 edition = "2021"
+default-run = "inventario-cappellettoshop"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

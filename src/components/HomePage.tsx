@@ -460,25 +460,6 @@ const HomePage: React.FC<HomePageProps> = ({
           );
           console.log("✅ Inventory adjustment successful:", result);
 
-          // Remove the old manual log entry since Firebase handles it now
-          // const logEntry = {
-          //   requestType: "Rettifica",
-          //   timestamp: new Date().toISOString(),
-          //   data: {
-          //     id: productDetails.id,
-          //     variant: selectedVariant,
-          //     negozio: primaryLocation,
-          //     inventory_item_id: variant.inventory_item_id,
-          //     nome: productDetails.nomeArticolo,
-          //     prezzo: productDetails.prezzo,
-          //     rettifica: -1,
-          //     images: productDetails.immaginiArticolo,
-          //   },
-          // };
-
-          // addLog(logEntry);
-          await fetchLogs();
-
           // Refresh product data to show updated inventory
           console.log("🔄 Refreshing product data...");
           await handleSearchSelect(
@@ -491,9 +472,12 @@ const HomePage: React.FC<HomePageProps> = ({
 
           // Show success modal
           setModifyModalVisible(true);
-          message.success(
-            `Inventario diminuito con successo per ${selectedVariant}`
-          );
+
+          // Show enhanced success message
+          message.success({
+            content: result.message,
+            duration: 4,
+          });
         } catch (error) {
           console.error("❌ Error decreasing inventory:", error);
           message.error(
@@ -566,23 +550,6 @@ const HomePage: React.FC<HomePageProps> = ({
       );
       console.log("✅ Inventory undo successful:", result);
 
-      // Remove the old manual log entry since Firebase handles it now
-      // const logEntry = {
-      //   requestType: "Annullamento",
-      //   timestamp: new Date().toISOString(),
-      //   data: {
-      //     id: productDetails.id,
-      //     variant: selectedVariant,
-      //     negozio: primaryLocation,
-      //     inventory_item_id: variant.inventory_item_id,
-      //     nome: productDetails.nomeArticolo,
-      //     prezzo: productDetails.prezzo,
-      //     rettifica: +1,
-      //     images: productDetails.immaginiArticolo,
-      //   },
-      // };
-
-      // addLog(logEntry);
       await fetchLogs();
 
       // Refresh product data to show updated inventory
@@ -594,9 +561,12 @@ const HomePage: React.FC<HomePageProps> = ({
 
       // Show success modal
       setUndoModalVisible(true);
-      message.success(
-        `Annullamento completato con successo per ${lastModifiedVariant}`
-      );
+
+      // Show enhanced success message
+      message.success({
+        content: result.message,
+        duration: 4,
+      });
     } catch (error) {
       console.error("❌ Error undoing change:", error);
       message.error(

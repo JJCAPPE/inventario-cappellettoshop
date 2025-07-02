@@ -5,7 +5,14 @@ import type {
   InventoryUpdate,
   StatusResponse,
   ProductModificationHistory,
+  EnhancedStatusResponse,
+  LocationInfo,
+  FirebaseConfig,
+  LogData,
+  CheckRequestData,
+  CheckRequest,
 } from "../types/index";
+import { message } from "antd";
 
 // Local type definitions that don't conflict
 export interface ProductVariant {
@@ -16,55 +23,11 @@ export interface ProductVariant {
   sku?: string;
 }
 
-export interface LocationInfo {
-  name: string;
-  id: string;
-}
-
 // Firebase-related type definitions
-export interface LogData {
-  id: string;
-  variant: string;
-  negozio: string;
-  inventory_item_id: string;
-  nome: string;
-  prezzo: string;
-  rettifica: number;
-  images: string[];
-}
-
 export interface LogEntry {
   requestType: string;
   data: LogData;
   timestamp: string;
-}
-
-export interface CheckRequest {
-  id?: string; // Document ID from Firebase
-  check_all: boolean;
-  checked: boolean;
-  location: string[];
-  notes: string;
-  priority: "low" | "medium" | "high";
-  product_id: number;
-  product_name: string;
-  requested_by: string;
-  status: "pending" | "completed" | "cancelled";
-  timestamp: string;
-  variant_id: number | null;
-  variant_name: string | null;
-  closing_notes?: string;
-  image_url?: string;
-}
-
-export interface FirebaseConfig {
-  api_key: string;
-  auth_domain: string;
-  project_id: string;
-  storage_bucket: string;
-  messaging_sender_id: string;
-  app_id: string;
-  measurement_id: string;
 }
 
 // Product API functions
@@ -411,9 +374,9 @@ export class InventoryAPI {
     price: string,
     negozio: string,
     images: string[]
-  ): Promise<StatusResponse> {
+  ): Promise<EnhancedStatusResponse> {
     try {
-      const result = await invoke<StatusResponse>(
+      const result = await invoke<EnhancedStatusResponse>(
         "decrease_inventory_with_logging",
         {
           inventoryItemId,
@@ -426,6 +389,7 @@ export class InventoryAPI {
           images,
         }
       );
+
       console.log(
         `🔍 Raw API Response - decrease_inventory_with_logging:`,
         result
@@ -433,6 +397,15 @@ export class InventoryAPI {
       console.log(
         `📝 Decreased inventory for ${productName} (${variantTitle}) at ${negozio}`
       );
+
+      // Show enhanced toast notifications based on status changes
+      if (result.status_changed === "to_draft") {
+        message.warning({
+          content: `${productName} è stato impostato come bozza (inventario esaurito)`,
+          duration: 5,
+        });
+      }
+
       return result;
     } catch (error) {
       console.error("Error decreasing inventory with logging:", error);
@@ -452,9 +425,9 @@ export class InventoryAPI {
     price: string,
     negozio: string,
     images: string[]
-  ): Promise<StatusResponse> {
+  ): Promise<EnhancedStatusResponse> {
     try {
-      const result = await invoke<StatusResponse>(
+      const result = await invoke<EnhancedStatusResponse>(
         "undo_decrease_inventory_with_logging",
         {
           inventoryItemId,
@@ -467,6 +440,7 @@ export class InventoryAPI {
           images,
         }
       );
+
       console.log(
         `🔍 Raw API Response - undo_decrease_inventory_with_logging:`,
         result
@@ -474,6 +448,15 @@ export class InventoryAPI {
       console.log(
         `📝 Undid inventory decrease for ${productName} (${variantTitle}) at ${negozio}`
       );
+
+      // Show enhanced toast notifications based on status changes
+      if (result.status_changed === "to_active") {
+        message.success({
+          content: `${productName} è stato riattivato (inventario disponibile)`,
+          duration: 5,
+        });
+      }
+
       return result;
     } catch (error) {
       console.error("Error undoing inventory decrease with logging:", error);
