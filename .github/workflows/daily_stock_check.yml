@@ -1,0 +1,40 @@
+name: Daily Stock Check
+
+on:
+  schedule:
+    # Runs at 12:00 UTC (e.g., 2:00 PM CET during summer) every two days.
+    - cron: '0 12 */2 * *'
+  workflow_dispatch: # Allows manual triggering from the Actions tab
+
+jobs:
+  run_stock_manager:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run Stock Manager
+        id: stock_manager
+        env:
+          SHOPIFY_SHOP_DOMAIN: ${{ secrets.SHOPIFY_SHOP_DOMAIN }}
+          SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
+          # NOTE: Add any other required secrets here.
+        run: |
+          # Run the script without the --dry-run flag to perform updates
+          cargo run --bin stock_manager
