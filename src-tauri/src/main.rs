@@ -10,6 +10,7 @@ use inventario_cappellettoshop_lib::inventory;
 use inventario_cappellettoshop_lib::location;
 use inventario_cappellettoshop_lib::products;
 use inventario_cappellettoshop_lib::status;
+use inventario_cappellettoshop_lib::stock;
 use inventario_cappellettoshop_lib::utils::AppConfig;
 
 fn create_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
@@ -146,7 +147,10 @@ fn main() {
             location::get_current_location_config,
             // Status commands
             status::test_shopify_connection,
-            status::greet
+            status::greet,
+            // Stock management commands
+            stock::get_products_with_no_stock,
+            stock::update_products_no_stock_to_draft
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

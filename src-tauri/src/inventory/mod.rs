@@ -311,8 +311,8 @@ pub async fn decrease_inventory_with_logging(
     negozio: String,
     images: Vec<String>,
     config: tauri::State<'_, AppConfig>,
-) -> Result<StatusResponse, String> {
-    println!("📦 Starting inventory decrease with logging:");
+) -> Result<EnhancedStatusResponse, String> {
+    println!("📦 Starting enhanced inventory decrease with logging:");
     println!("   🏪 Store: {}", negozio);
     println!("   📦 Product: {} ({})", product_name, variant_title);
     println!("   📍 Location ID: {}", location_id);
@@ -328,6 +328,27 @@ pub async fn decrease_inventory_with_logging(
     println!("📉 Adjusting Shopify inventory...");
     adjust_inventory(config.clone(), vec![update]).await?;
     println!("✅ Shopify inventory adjusted successfully");
+
+    // Check if product now has zero inventory across all locations
+    let mut status_changed = None;
+    let mut current_product_status = None;
+
+    let has_zero_inventory = has_zero_inventory_across_all_locations(&config, &product_id).await?;
+
+    if has_zero_inventory {
+        println!("🎯 Product has zero inventory across all locations - setting to draft");
+        match update_product_status(&config, &product_id, "draft").await {
+            Ok(_) => {
+                status_changed = Some("to_draft".to_string());
+                current_product_status = Some("draft".to_string());
+                println!("✅ Product status updated to draft");
+            }
+            Err(e) => {
+                println!("⚠️ Failed to update product status to draft: {}", e);
+                // Continue with the operation even if status update fails
+            }
+        }
+    }
 
     // Create log entry
     let log_data = create_inventory_log_data(
@@ -352,10 +373,21 @@ pub async fn decrease_inventory_with_logging(
 
     firebase_client.create_log(log_entry).await?;
 
-    println!("✅ Inventory decrease completed with logging");
-    Ok(StatusResponse {
+    let base_message = "Inventario diminuito e registrato con successo".to_string();
+    let enhanced_message = match &status_changed {
+        Some(_) => format!(
+            "{} - Prodotto impostato come bozza (inventario esaurito)",
+            base_message
+        ),
+        None => base_message,
+    };
+
+    println!("✅ Enhanced inventory decrease completed with logging");
+    Ok(EnhancedStatusResponse {
         status: "success".to_string(),
-        message: "Inventory decreased and logged successfully".to_string(),
+        message: enhanced_message,
+        status_changed,
+        product_status: current_product_status,
     })
 }
 
@@ -370,12 +402,15 @@ pub async fn undo_decrease_inventory_with_logging(
     negozio: String,
     images: Vec<String>,
     config: tauri::State<'_, AppConfig>,
-) -> Result<StatusResponse, String> {
-    println!("🔄 Starting inventory undo (increase) with logging:");
+) -> Result<EnhancedStatusResponse, String> {
+    println!("🔄 Starting enhanced inventory undo (increase) with logging:");
     println!("   🏪 Store: {}", negozio);
     println!("   📦 Product: {} ({})", product_name, variant_title);
     println!("   📍 Location ID: {}", location_id);
     println!("   🔢 Inventory Item ID: {}", inventory_item_id);
+
+    // Check if product currently has zero inventory (to know if we should activate it)
+    let had_zero_inventory = has_zero_inventory_across_all_locations(&config, &product_id).await?;
 
     // Adjust inventory first (increase by 1)
     let update = InventoryUpdate {
@@ -387,6 +422,25 @@ pub async fn undo_decrease_inventory_with_logging(
     println!("📈 Adjusting Shopify inventory (undo)...");
     adjust_inventory(config.clone(), vec![update]).await?;
     println!("✅ Shopify inventory adjusted successfully");
+
+    // If product had zero inventory and now has some, set it back to active
+    let mut status_changed = None;
+    let mut current_product_status = None;
+
+    if had_zero_inventory {
+        println!("🎯 Product previously had zero inventory - setting back to active");
+        match update_product_status(&config, &product_id, "active").await {
+            Ok(_) => {
+                status_changed = Some("to_active".to_string());
+                current_product_status = Some("active".to_string());
+                println!("✅ Product status updated to active");
+            }
+            Err(e) => {
+                println!("⚠️ Failed to update product status to active: {}", e);
+                // Continue with the operation even if status update fails
+            }
+        }
+    }
 
     // Create log entry
     let log_data = create_inventory_log_data(
@@ -411,10 +465,21 @@ pub async fn undo_decrease_inventory_with_logging(
 
     firebase_client.create_log(log_entry).await?;
 
-    println!("✅ Inventory undo completed with logging");
-    Ok(StatusResponse {
+    let base_message = "Inventario ripristinato e registrato con successo".to_string();
+    let enhanced_message = match &status_changed {
+        Some(_) => format!(
+            "{} - Prodotto riattivato (inventario disponibile)",
+            base_message
+        ),
+        None => base_message,
+    };
+
+    println!("✅ Enhanced inventory undo completed with logging");
+    Ok(EnhancedStatusResponse {
         status: "success".to_string(),
-        message: "Inventory increase (undo) and logged successfully".to_string(),
+        message: enhanced_message,
+        status_changed,
+        product_status: current_product_status,
     })
 }
 
@@ -705,4 +770,93 @@ pub async fn adjust_inventory_graphql(
         status: "success".to_string(),
         message: format!("Inventory adjusted by {} via GraphQL", delta),
     })
+}
+
+/// Check if a product has zero inventory across all locations
+async fn has_zero_inventory_across_all_locations(
+    config: &tauri::State<'_, AppConfig>,
+    product_id: &str,
+) -> Result<bool, String> {
+    println!("🔍 Checking total inventory for product {}", product_id);
+
+    // Get product details to find all variants
+    let product =
+        crate::products::get_product_by_id(config.clone(), product_id.to_string()).await?;
+
+    // Get all inventory item IDs
+    let inventory_item_ids: Vec<String> = product
+        .variants
+        .iter()
+        .map(|v| v.inventory_item_id.clone())
+        .collect();
+
+    // Get inventory levels across all locations
+    let inventory_levels = get_inventory_levels(config.clone(), inventory_item_ids).await?;
+
+    // Check if all variants have zero inventory across all locations
+    let has_inventory = inventory_levels
+        .values()
+        .any(|location_map| location_map.values().any(|&quantity| quantity > 0));
+
+    let is_zero = !has_inventory;
+    println!("📊 Product {} has zero inventory: {}", product_id, is_zero);
+
+    Ok(is_zero)
+}
+
+/// Update product status (active/draft)
+async fn update_product_status(
+    config: &tauri::State<'_, AppConfig>,
+    product_id: &str,
+    new_status: &str,
+) -> Result<(), String> {
+    println!(
+        "📝 Updating product {} status to: {}",
+        product_id, new_status
+    );
+
+    let client = reqwest::Client::new();
+    let url = config.get_api_url(&format!("products/{}.json", product_id));
+
+    let request_body = json!({
+        "product": {
+            "id": product_id.parse::<u64>().map_err(|e| format!("Invalid product ID: {}", e))?,
+            "status": new_status
+        }
+    });
+
+    let response = client
+        .put(&url)
+        .headers(config.get_headers())
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read error".to_string());
+        return Err(format!(
+            "Failed to update product status: {} - {}",
+            status, error_text
+        ));
+    }
+
+    println!(
+        "✅ Successfully updated product {} status to {}",
+        product_id, new_status
+    );
+    Ok(())
+}
+
+/// Enhanced response that includes status change information
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EnhancedStatusResponse {
+    pub status: String,
+    pub message: String,
+    pub status_changed: Option<String>, // "to_draft", "to_active", or None
+    pub product_status: Option<String>, // Current product status
 }
