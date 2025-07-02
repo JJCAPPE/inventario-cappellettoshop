@@ -174,3 +174,33 @@ export interface SearchResult {
   title: string;
   image?: string;
 }
+
+// Location-related types
+export interface LocationInfo {
+  name: string;
+  id: string;
+}
+
+// Check request types
+export interface CheckRequest {
+  check_all: boolean;
+  checked: boolean;
+  checked_at?: string;
+  checked_by?: string;
+  location: string[];
+  notes: string;
+  priority: string;
+  product_id: number;
+  product_name: string;
+  requested_by: string;
+  status: string;
+  timestamp: string;
+  variant_id?: number;
+  variant_name?: string;
+  image_url?: string;
+}
+
+export interface CheckRequestWithId extends CheckRequest {
+  id: string; // Document ID from Firebase
+  closing_notes?: string;
+}

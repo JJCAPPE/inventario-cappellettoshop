@@ -9,7 +9,6 @@ import type {
   LocationInfo,
   FirebaseConfig,
   LogData,
-  CheckRequestData,
   CheckRequest,
 } from "../types/index";
 import { message } from "antd";

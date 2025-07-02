@@ -68,9 +68,7 @@ pub struct ShopifyProduct {
 
 #[derive(Debug, Deserialize)]
 struct ShopifyVariant {
-    id: u64,
     inventory_quantity: i32,
-    title: String,
 }
 
 /// Tauri command to get products with no stock (dry run)
