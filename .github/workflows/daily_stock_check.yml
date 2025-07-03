@@ -3,7 +3,7 @@ name: Daily Stock Check
 on:
   schedule:
     # Runs at 12:00 UTC (e.g., 2:00 PM CET during summer) every two days.
-    - cron: '0 12 */2 * *'
+    - cron: "0 12 */2 * *"
   workflow_dispatch: # Allows manual triggering from the Actions tab
 
 jobs:
@@ -17,7 +17,17 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libgdk-pixbuf2.0-dev \
+            libpango1.0-dev \
+            libcairo2-dev \
+            libatk1.0-dev \
+            libssl-dev \
+            pkg-config
 
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
