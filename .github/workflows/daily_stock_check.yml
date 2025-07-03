@@ -32,6 +32,4 @@ jobs:
           EMAIL_SERVER_USER: ${{ secrets.EMAIL_SERVER_USER }}
           EMAIL_SERVER_PASSWORD: ${{ secrets.EMAIL_SERVER_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
-        run: npm run stock:update --
-
+        run: npm run stock:update -- --silent

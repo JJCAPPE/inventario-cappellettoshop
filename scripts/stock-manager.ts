@@ -77,9 +77,9 @@ function getEmailConfig(): EmailConfig | null {
     const user = process.env.EMAIL_SERVER_USER;
     const pass = process.env.EMAIL_SERVER_PASSWORD;
     const from = process.env.EMAIL_FROM;
-    const to = process.env.EMAIL_TO;
+    const to = "info@cappellettoshop.it, elisa@cappellettoshop.it, giacomo.cappelletto@icloud.com";
 
-    if (!host || !port || !user || !pass || !from || !to) {
+    if (!host || !port || !user || !pass || !from) {
         return null;
     }
 
