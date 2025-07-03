@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import "dotenv/config";
+import nodemailer from "nodemailer";
 
 // --- CONFIGURATION ---
 
@@ -10,6 +11,16 @@ interface AppConfig {
   accessToken: string;
   apiVersion: string;
 }
+
+interface EmailConfig {
+    host: string;
+    port: number;
+    user: string;
+    pass: string;
+    from: string;
+    to: string;
+}
+
 
 // --- TYPES ---
 
@@ -60,6 +71,28 @@ function getAppConfig(): AppConfig {
   return { shopDomain, accessToken, apiVersion };
 }
 
+function getEmailConfig(): EmailConfig | null {
+    const host = process.env.EMAIL_SERVER_HOST;
+    const port = process.env.EMAIL_SERVER_PORT;
+    const user = process.env.EMAIL_SERVER_USER;
+    const pass = process.env.EMAIL_SERVER_PASSWORD;
+    const from = process.env.EMAIL_FROM;
+    const to = process.env.EMAIL_TO;
+
+    if (!host || !port || !user || !pass || !from || !to) {
+        return null;
+    }
+
+    return {
+        host,
+        port: parseInt(port, 10),
+        user,
+        pass,
+        from,
+        to,
+    };
+}
+
 function createShopifyClient(config: AppConfig): AxiosInstance {
   return axios.create({
     baseURL: `https://${config.shopDomain}/admin/api/${config.apiVersion}`,
@@ -87,14 +120,12 @@ function parseLinkHeader(header: string): { next?: string } {
   return { next: links["next"] };
 }
 
+
 // --- CORE LOGIC ---
 
-async function fetchAllProducts(
-  client: AxiosInstance,
-): Promise<ShopifyProduct[]> {
+async function fetchAllProducts(client: AxiosInstance, log: (message: string) => void): Promise<ShopifyProduct[]> {
   let allProducts: ShopifyProduct[] = [];
-  let url: string | undefined =
-    "/products.json?limit=250&fields=id,title,status,variants&status=active";
+  let url: string | undefined = "/products.json?limit=250&fields=id,title,status,variants&status=active";
   let pageCount = 0;
 
   while (url) {
@@ -102,7 +133,7 @@ async function fetchAllProducts(
     try {
       const response = await client.get(url);
       const products = response.data.products as ShopifyProduct[];
-      console.log(
+      log(
         `   📄 Page ${pageCount}: Fetched ${products.length} products`,
       );
       allProducts = allProducts.concat(products);
@@ -114,6 +145,7 @@ async function fetchAllProducts(
       if (url) {
         await sleep(100); // Respect rate limits
       }
+
     } catch (error: any) {
       throw new Error(`Failed to fetch products: ${error.message}`);
     }
@@ -136,24 +168,16 @@ function findProductsWithNoStock(products: ShopifyProduct[]): ProductNoStock[] {
     }));
 }
 
-async function updateProductsToDraft(
-  client: AxiosInstance,
-  products: ProductNoStock[],
-): Promise<UpdateResult[]> {
+async function updateProductsToDraft(client: AxiosInstance, products: ProductNoStock[], log: (message: string) => void): Promise<UpdateResult[]> {
   const results: UpdateResult[] = [];
   for (const [index, product] of products.entries()) {
-    console.log(
+    log(
       `   📝 (${index + 1}/${products.length}) Updating: "${product.title}" (ID: ${product.id})`,
     );
 
     if (product.is_excluded) {
-      console.log("   🛡️ EXCLUDED - Skipping update");
-      results.push({
-        productId: product.id,
-        title: product.title,
-        success: true,
-        error: "Excluded from updates",
-      });
+      log("   🛡️ EXCLUDED - Skipping update");
+      results.push({ productId: product.id, title: product.title, success: true, error: "Excluded from updates" });
       continue;
     }
 
@@ -164,111 +188,156 @@ async function updateProductsToDraft(
           status: "draft",
         },
       });
-      console.log("   ✅ Successfully set to draft");
-      results.push({
-        productId: product.id,
-        title: product.title,
-        success: true,
-      });
+      log("   ✅ Successfully set to draft");
+      results.push({ productId: product.id, title: product.title, success: true });
     } catch (error: any) {
       const errorMessage = error.response?.data?.errors || error.message;
-      console.error(`   ❌ Failed to update: ${JSON.stringify(errorMessage)}`);
-      results.push({
-        productId: product.id,
-        title: product.title,
-        success: false,
-        error: JSON.stringify(errorMessage),
-      });
+      log(`   ❌ Failed to update: ${JSON.stringify(errorMessage)}`);
+      results.push({ productId: product.id, title: product.title, success: false, error: JSON.stringify(errorMessage) });
     }
 
     if (index < products.length - 1) {
-      await sleep(250); // Rate limiting
+        await sleep(250); // Rate limiting
     }
   }
   return results;
 }
 
-function generateSummary(
-  products: ProductNoStock[],
-  updateResults: UpdateResult[],
-  dryRun: boolean,
-): UpdateSummary {
-  const total_found = products.length;
-  const excluded_count = products.filter((p) => p.is_excluded).length;
-  const eligible_count = total_found - excluded_count;
-  const successful_updates = dryRun
-    ? 0
-    : updateResults.filter((r) => r.success && !r.error).length;
-  const failed_updates = dryRun
-    ? 0
-    : updateResults.filter((r) => !r.success).length;
+function generateSummary(products: ProductNoStock[], updateResults: UpdateResult[], dryRun: boolean): UpdateSummary {
+    const total_found = products.length;
+    const excluded_count = products.filter(p => p.is_excluded).length;
+    const eligible_count = total_found - excluded_count;
+    const successful_updates = dryRun ? 0 : updateResults.filter(r => r.success && !r.error).length;
+    const failed_updates = dryRun ? 0 : updateResults.filter(r => !r.success).length;
 
-  return {
-    total_found,
-    excluded_count,
-    eligible_count,
-    successful_updates,
-    failed_updates,
-  };
+    return { total_found, excluded_count, eligible_count, successful_updates, failed_updates };
 }
 
-function printResults(
-  products: ProductNoStock[],
-  updateResults: UpdateResult[],
-  summary: UpdateSummary,
-  dryRun: boolean,
-) {
-  console.log("\n🎯 FINAL RESULTS:");
-  console.log("═".repeat(80));
+function generateHtmlReport(summary: UpdateSummary, products: ProductNoStock[], updateResults: UpdateResult[], dryRun: boolean, shopDomain: string): string {
+    const now = new Date().toLocaleString('it-IT', { timeZone: 'CET' });
+    const adminUrl = `https://${shopDomain}/admin`;
 
-  if (products.length === 0) {
-    console.log("✨ No active products found with zero stock!");
-  } else {
-    console.log(
-      `📦 Found ${summary.total_found} active products with no stock`,
-    );
+    let body = `
+        <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #333; background-color: #f4f5f7; }
+            .container { max-width: 800px; margin: 20px auto; padding: 20px; border-radius: 8px; background-color: #fff; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+            h1, h2 { color: #111; }
+            h1 { font-size: 24px; text-align: center; margin-bottom: 10px; }
+            h2 { font-size: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 40px; }
+            .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+            .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin: 20px 0; }
+            .summary-item { background-color: #f9fafb; padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #e5e7eb; }
+            .summary-item strong { display: block; font-size: 28px; color: #005b99; }
+            .product-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            .product-table th, .product-table td { text-align: left; padding: 12px 15px; border-bottom: 1px solid #ddd; }
+            .product-table th { background-color: #f2f2f2; }
+            .product-table tr:hover { background-color: #f5f5f5; }
+            .status-cell { text-align: right; }
+            .status-tag { padding: 5px 10px; border-radius: 15px; font-weight: bold; font-size: 0.9em; }
+            .status-success { background-color: #d4edda; color: #155724; }
+            .status-fail { background-color: #f8d7da; color: #721c24; }
+            .status-excluded { background-color: #fff3cd; color: #856404; }
+            .status-info { background-color: #d1ecf1; color: #0c5460; }
+            .error-msg { color: #d9534f; font-size: 0.9em; }
+            a { color: #007bff; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+            footer { margin-top: 40px; text-align: center; font-size: 0.8em; color: #888; }
+        </style>
+        <div class="container">
+            <h1>Report Inventario Shopify</h1>
+            <p class="subtitle">Controllo automatico eseguito il: <strong>${now}</strong> | Negozio: <a href="https://${shopDomain}">${shopDomain}</a></p>
+            ${dryRun ? '<h2 style="color: #f0ad4e; text-align: center;">⚠️ ESECUZIONE IN MODALITÀ ANTEPRIMA (DRY RUN) ⚠️</h2>' : ''}
+
+            <h2>Riepilogo</h2>
+            <div class="summary-grid">
+                <div class="summary-item">Prodotti Trovati<strong>${summary.total_found}</strong></div>
+                <div class="summary-item">Prodotti Aggiornati<strong>${summary.successful_updates}</strong></div>
+                <div class="summary-item">Aggiornamenti Falliti<strong>${summary.failed_updates}</strong></div>
+                <div class="summary-item">Prodotti Esclusi<strong>${summary.excluded_count}</strong></div>
+            </div>
+    `;
+
+    const renderTable = (title: string, items: any[], columns: {header: string, cell: (item: any) => string}[]) => {
+        let table = `<h2>${title}</h2>`;
+        if (items.length === 0) {
+            return table + '<p>Nessun prodotto in questa categoria.</p>';
+        }
+        table += '<table class="product-table"><thead><tr>';
+        columns.forEach(col => table += `<th>${col.header}</th>`);
+        table += '</tr></thead><tbody>';
+        items.forEach(item => {
+            table += '<tr>';
+            columns.forEach(col => table += `<td>${col.cell(item)}</td>`);
+            table += '</tr>';
+        });
+        table += '</tbody></table>';
+        return table;
+    };
 
     if (dryRun) {
-      console.log("\n🧪 DRY RUN - Products that would be affected:");
-      products.forEach((p, i) => {
-        const status = p.is_excluded ? "[EXCLUDED]" : "";
-        console.log(`${i + 1}. "${p.title}" (ID: ${p.id}) ${status}`);
-      });
-      if (summary.excluded_count > 0) {
-        console.log(
-          `\n🛡️ ${summary.excluded_count} products are excluded from updates.`,
-        );
-      }
-      console.log(
-        `\n💡 ${summary.eligible_count} products would be updated to draft status.`,
-      );
+        body += renderTable('Prodotti che verrebbero modificati', products, [
+            { header: 'Prodotto', cell: p => `<a href="${adminUrl}/products/${p.id}">${p.title}</a>` },
+            { header: 'ID', cell: p => p.id },
+            { header: 'Stato', cell: p => `<div class="status-cell"><span class="status-tag ${p.is_excluded ? 'status-excluded' : 'status-info'}">${p.is_excluded ? 'ESCLUSO' : 'DA AGGIORNARE'}</span></div>` },
+        ]);
     } else {
-      console.log(
-        `\n✅ Successfully updated: ${summary.successful_updates} products`,
-      );
-      if (summary.excluded_count > 0) {
-        console.log(
-          `🛡️ Excluded from updates: ${summary.excluded_count} products`,
-        );
-      }
-      if (summary.failed_updates > 0) {
-        console.log(`❌ Failed to update: ${summary.failed_updates} products`);
-        console.log("\nFailed products:");
-        updateResults
-          .filter((r) => !r.success)
-          .forEach((r, i) => {
-            console.log(
-              `${i + 1}. "${r.title}" (ID: ${r.productId}): ${r.error}`,
-            );
-          });
-      }
+        const updated = updateResults.filter(r => r.success && !r.error);
+        const failed = updateResults.filter(r => !r.success);
+
+        if (updated.length > 0) {
+            body += renderTable('Prodotti Aggiornati a Bozza', updated, [
+                { header: 'Prodotto', cell: r => `<a href="${adminUrl}/products/${r.productId}">${r.title}</a>` },
+                { header: 'ID', cell: r => r.productId },
+                { header: 'Stato', cell: () => `<div class="status-cell"><span class="status-tag status-success">AGGIORNATO</span></div>` },
+            ]);
+        }
+
+        if (failed.length > 0) {
+            body += renderTable('Aggiornamenti Falliti', failed, [
+                { header: 'Prodotto', cell: r => `<a href="${adminUrl}/products/${r.productId}">${r.title}</a>` },
+                { header: 'ID', cell: r => r.productId },
+                { header: 'Errore', cell: r => `<div class="status-cell"><span class="status-tag status-fail">FALLITO</span><br><small class="error-msg">${r.error}</small></div>` },
+            ]);
+        }
     }
-  }
-  console.log("═".repeat(80));
+
+    if (summary.total_found === 0) {
+        body += '<h2>Risultato</h2><p style="text-align:center; font-size: 1.2em;">✅ Tutto in ordine! Nessun prodotto attivo con scorte esaurite trovato.</p>';
+    }
+
+    body += '<footer>Questo è un report automatico. Non rispondere a questa email.</footer></div>';
+    return body;
 }
 
+async function sendEmailReport(emailConfig: EmailConfig, htmlBody: string, dryRun: boolean) {
+    const transporter = nodemailer.createTransport({
+        host: emailConfig.host,
+        port: emailConfig.port,
+        secure: emailConfig.port === 465, // true for 465, false for other ports
+        auth: {
+            user: emailConfig.user,
+            pass: emailConfig.pass,
+        },
+    });
+
+    const subject = dryRun ? 'Report Inventario Shopify (DRY RUN)' : 'Report Inventario Shopify';
+
+    try {
+        await transporter.sendMail({
+            from: `"Shopify Stock Manager" <${emailConfig.from}>`,
+            to: emailConfig.to,
+            subject: subject,
+            html: htmlBody,
+        });
+        console.log('✅ Email report sent successfully.');
+    } catch (error) {
+        console.error(`❌ Failed to send email report: ${error}`);
+    }
+}
+
+
 function printHelp() {
-  console.log(`
+    console.log(`
 Shopify Stock Manager - TypeScript Edition
 
 DESCRIPTION:
@@ -281,12 +350,15 @@ USAGE:
 OPTIONS:
     -d, --dry-run    Preview changes without making any updates.
     -h, --help       Show this help message.
+    --silent         Do not log progress to console (for cron jobs).
 
 CONFIGURATION:
     Reads configuration from the .env file in the project root.
-    Ensure SHOPIFY_SHOP_DOMAIN and SHOPIFY_ACCESS_TOKEN are set.
+    Ensure SHOPIFY_SHOP_DOMAIN, SHOPIFY_ACCESS_TOKEN are set.
+    For email reports, also set EMAIL_* variables.
     `);
 }
+
 
 // --- MAIN EXECUTION ---
 
@@ -294,54 +366,73 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run") || args.includes("-d");
   const showHelp = args.includes("--help") || args.includes("-h");
+  const silent = args.includes("--silent");
+
+  const log = silent ? (message: string) => {} : (message: string) => console.log(message);
 
   if (showHelp) {
     printHelp();
     return;
   }
 
-  console.log("🛠️  Shopify Stock Manager (TypeScript Edition)");
-  console.log("=============================================\n");
+  log("🛠️  Shopify Stock Manager (TypeScript Edition)");
+  log("=============================================\n");
 
   try {
     const config = getAppConfig();
+    const emailConfig = getEmailConfig();
     const client = createShopifyClient(config);
 
-    console.log(`📍 Shop: ${config.shopDomain}`);
-    console.log(`🔧 API Version: ${config.apiVersion}`);
-    console.log(
+    log(`📍 Shop: ${config.shopDomain}`);
+    log(`🔧 API Version: ${config.apiVersion}`);
+    log(
       dryRun
         ? "🧪 DRY RUN MODE - No changes will be made"
         : "⚡ LIVE MODE - Products will be set to draft status",
     );
 
-    console.log("\n📄 Fetching all products...");
-    const allProducts = await fetchAllProducts(client);
-    console.log(`✅ Fetched ${allProducts.length} total products`);
+    log("\n📄 Fetching all products...");
+    const allProducts = await fetchAllProducts(client, log);
+    log(`✅ Fetched ${allProducts.length} total products`);
 
-    console.log("\n🔍 Analyzing inventory...");
+    log("\n🔍 Analyzing inventory...");
     const productsWithNoStock = findProductsWithNoStock(allProducts);
-    console.log(
+    log(
       `🎯 Found ${productsWithNoStock.length} active products with no stock`,
     );
 
     let updateResults: UpdateResult[] = [];
     if (!dryRun && productsWithNoStock.length > 0) {
-      console.log("\n📝 Updating products to draft status...");
-      updateResults = await updateProductsToDraft(client, productsWithNoStock);
+        log("\n📝 Updating products to draft status...");
+        updateResults = await updateProductsToDraft(client, productsWithNoStock, log);
     }
 
     const summary = generateSummary(productsWithNoStock, updateResults, dryRun);
-    printResults(productsWithNoStock, updateResults, summary, dryRun);
+    const htmlReport = generateHtmlReport(summary, productsWithNoStock, updateResults, dryRun, config.shopDomain);
 
-    console.log("\n🎉 Operation completed successfully!");
-    if (!dryRun && summary.successful_updates > 0) {
-      console.log(
-        `📈 Updated ${summary.successful_updates} products to draft status`,
-      );
+    if (emailConfig) {
+        await sendEmailReport(emailConfig, htmlReport, dryRun);
+    } else if (!silent) {
+        console.warn('⚠️ Email configuration not found, skipping email report. Set EMAIL_* env variables to enable.');
     }
+
+    if (!silent) {
+        // The equivalent of printResults is now part of the email report.
+        // We can log a simple summary here for non-silent runs.
+        log("\n🎉 Operation completed successfully!");
+        if (!dryRun && summary.successful_updates > 0) {
+            log(`📈 Updated ${summary.successful_updates} products to draft status`);
+        }
+    }
+
   } catch (error: any) {
-    console.error(`\n❌ Operation failed: ${error.message}`);
+    console.error("\n❌ Operation failed: ${error.message}");
+    // Also send an email on failure if possible
+    const emailConfig = getEmailConfig();
+    if (emailConfig) {
+        const errorHtml = `<h1>Shopify Stock Manager Failed</h1><p>The job failed with the following error:</p><pre>${error.stack}</pre>`;
+        await sendEmailReport(emailConfig, errorHtml, false);
+    }
     process.exit(1);
   }
 }

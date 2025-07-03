@@ -3,7 +3,7 @@ name: Daily Stock Check
 on:
   schedule:
     # Runs at 12:00 UTC (e.g., 2:00 PM CET during summer) every two days.
-    - cron: '0 12 */2 * *'
+    - cron: "0 12 */2 * *"
   workflow_dispatch: # Allows manual triggering from the Actions tab
 
 jobs:
@@ -16,8 +16,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Or your project's specific version
-          cache: 'npm'
+          node-version: "20" # Or your project's specific version
+          cache: "npm"
 
       - name: Install dependencies
         run: npm install
@@ -27,4 +27,11 @@ jobs:
           SHOPIFY_SHOP_DOMAIN: ${{ secrets.SHOPIFY_SHOP_DOMAIN }}
           SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
           SHOPIFY_API_VERSION: ${{ secrets.SHOPIFY_API_VERSION }}
-        run: npm run stock:update
+          EMAIL_SERVER_HOST: ${{ secrets.EMAIL_SERVER_HOST }}
+          EMAIL_SERVER_PORT: ${{ secrets.EMAIL_SERVER_PORT }}
+          EMAIL_SERVER_USER: ${{ secrets.EMAIL_SERVER_USER }}
+          EMAIL_SERVER_PASSWORD: ${{ secrets.EMAIL_SERVER_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: npm run stock:update --
+
