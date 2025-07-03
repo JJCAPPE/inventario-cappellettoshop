@@ -708,7 +708,7 @@ fn test_dry_run_all_functions() {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "3.0.5".to_string(),
+        api_version: "3.1.0".to_string(),
         primary_location: "12345".to_string(),
         secondary_location: "67890".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -718,7 +718,7 @@ fn test_dry_run_all_functions() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.0.5".to_string(),
+        version: "3.1.0".to_string(),
     };
 
     // Test URL generation for all endpoints

@@ -75,7 +75,7 @@ impl AppConfig {
 
         // Check if we're in development mode
         let is_dev = std::env::var("DEV_ENV")
-            .unwrap_or_else(|_| "3.0.5".to_string())
+            .unwrap_or_else(|_| "3.1.0".to_string())
             .parse::<bool>()
             .unwrap_or(false);
 
@@ -100,7 +100,7 @@ impl AppConfig {
         let api_secret = std::env::var("SHOPIFY_API_SECRET_KEY")
             .map_err(|_| "SHOPIFY_API_SECRET_KEY must be set in .env file")?;
         let api_version =
-            std::env::var("SHOPIFY_API_VERSION").unwrap_or_else(|_| "3.0.5".to_string());
+            std::env::var("SHOPIFY_API_VERSION").unwrap_or_else(|_| "3.1.0".to_string());
         let primary_location = std::env::var("LOCATION_TREVISO")
             .map_err(|_| "LOCATION_TREVISO must be set in .env file")?;
         let secondary_location = std::env::var("LOCATION_MOGLIANO")
@@ -123,7 +123,7 @@ impl AppConfig {
             .map_err(|_| "FIREBASE_MEASUREMENT_ID must be set in .env file")?;
 
         // App Configuration
-        let version = std::env::var("VERSION").unwrap_or_else(|_| "3.0.5".to_string());
+        let version = std::env::var("VERSION").unwrap_or_else(|_| "3.1.0".to_string());
 
         Ok(AppConfig {
             shop_domain,
@@ -198,7 +198,7 @@ impl AppConfig {
             .to_string();
 
         // App Configuration
-        let version = option_env!("VERSION").unwrap_or("3.0.5").to_string();
+        let version = option_env!("VERSION").unwrap_or("3.1.0").to_string();
 
         Ok(AppConfig {
             shop_domain,
