@@ -83,6 +83,7 @@ interface UpdateSummary {
   successful_updates: number;
   failed_updates: number;
   discrepancies_found: number;
+  negative_stock_count: number;
 }
 
 // --- UTILITY FUNCTIONS ---
@@ -108,8 +109,7 @@ function getEmailConfig(): EmailConfig | null {
   const user = process.env.EMAIL_SERVER_USER;
   const pass = process.env.EMAIL_SERVER_PASSWORD;
   const from = process.env.EMAIL_FROM;
-  const to =
-    "info@cappellettoshop.it, elisa@cappellettoshop.it, giacomo.cappelletto@icloud.com";
+  const to = "elisa@cappellettoshop.it, giacomo.cappelletto@icloud.com";
 
   if (!host || !port || !user || !pass || !from) {
     return null;
@@ -369,6 +369,14 @@ function findProductsWithNoStock(
   return productStockInfos.filter((product) => product.totalStock <= 0);
 }
 
+function findProductsWithNegativeStock(
+  productStockInfos: ProductStockInfo[]
+): ProductStockInfo[] {
+  return productStockInfos.filter((product) =>
+    product.variants.some((variant) => variant.variantQuantityStock < 0)
+  );
+}
+
 async function updateProductsToDraft(
   client: AxiosInstance,
   products: ProductStockInfo[],
@@ -429,8 +437,13 @@ function generateSummary(
   updateResults: UpdateResult[],
   dryRun: boolean
 ): UpdateSummary {
-  const total_found = products.length;
-  const excluded_count = products.filter((p) => p.is_excluded).length;
+  const productsWithNoStock = products.filter(
+    (product) => product.totalStock <= 0
+  );
+  const total_found = productsWithNoStock.length;
+  const excluded_count = productsWithNoStock.filter(
+    (p) => p.is_excluded
+  ).length;
   const eligible_count = total_found - excluded_count;
   const successful_updates = dryRun
     ? 0
@@ -441,6 +454,11 @@ function generateSummary(
   const discrepancies_found = products.filter(
     (p) => p.stockSources.agreementStatus !== "MATCH"
   ).length;
+  const negative_stock_count = products.filter(
+    (p) =>
+      !p.is_excluded &&
+      p.variants.some((variant) => variant.variantQuantityStock < 0)
+  ).length;
 
   return {
     total_found,
@@ -449,6 +467,7 @@ function generateSummary(
     successful_updates,
     failed_updates,
     discrepancies_found,
+    negative_stock_count,
   };
 }
 
@@ -513,22 +532,59 @@ function generateHtmlReport(
                 <div class="summary-item">Prodotti Esclusi<strong>${
                   summary.excluded_count
                 }</strong></div>
-                <div class="summary-item">Discrepanze Rilevate<strong style="color: #ffc107;">${
-                  summary.discrepancies_found
+                <div class="summary-item">Quantità Negative<strong style="color: #dc3545;">${
+                  summary.negative_stock_count
                 }</strong></div>
             </div>
-
-            ${
-              summary.discrepancies_found > 0
-                ? `
-            <div class="discrepancy-note">
-                <strong>⚠️ Attenzione:</strong> Sono state rilevate ${summary.discrepancies_found} discrepanze tra i dati dell'API Inventory Levels e le quantità delle varianti. 
-                Il sistema ora utilizza le quantità delle varianti come fonte primaria, poiché risultano più affidabili dell'API Inventory Levels.
-            </div>
-            `
-                : ""
-            }
     `;
+
+  // Add negative stock products table if any exist (excluding blacklisted products)
+  const negativeStockProducts = products.filter(
+    (p) =>
+      !p.is_excluded &&
+      p.variants.some((variant) => variant.variantQuantityStock < 0)
+  );
+
+  if (negativeStockProducts.length > 0) {
+    body += `
+        <h2 style="color: #dc3545;">⚠️ Prodotti con Quantità Negative (Errori di Inventario)</h2>
+        <div style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+            <strong>Attenzione:</strong> I seguenti prodotti hanno varianti con quantità negative. Questo indica errori nei dati di inventario che dovrebbero essere corretti manualmente.
+        </div>
+        <table class="product-table">
+            <thead>
+                <tr>
+                    <th>Prodotto</th>
+                    <th>ID</th>
+                    <th>Varianti con Quantità Negative</th>
+                    <th>Stock Totale</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    negativeStockProducts.forEach((product) => {
+      const negativeVariants = product.variants.filter(
+        (v) => v.variantQuantityStock < 0
+      );
+      const variantDetails = negativeVariants
+        .map(
+          (v) => `${v.title} (${v.sku || "No SKU"}): ${v.variantQuantityStock}`
+        )
+        .join("<br>");
+
+      body += `
+                <tr>
+                    <td><a href="${adminUrl}/products/${product.id}">${product.title}</a></td>
+                    <td>${product.id}</td>
+                    <td style="color: #dc3545; font-weight: bold;">${variantDetails}</td>
+                    <td>${product.totalStock}</td>
+                </tr>`;
+    });
+
+    body += `
+            </tbody>
+        </table>`;
+  }
 
   const renderTable = (
     title: string,
@@ -552,39 +608,36 @@ function generateHtmlReport(
   };
 
   if (dryRun) {
-    body += renderTable("Prodotti che verrebbero modificati", products, [
-      {
-        header: "Prodotto",
-        cell: (p) => `<a href="${adminUrl}/products/${p.id}">${p.title}</a>`,
-      },
-      { header: "ID", cell: (p) => p.id },
-      { header: "Stock Finale", cell: (p) => p.totalStock.toString() },
-      {
-        header: "Stock API",
-        cell: (p) => p.stockSources.inventoryLevels.toString(),
-      },
-      {
-        header: "Stock Varianti",
-        cell: (p) => p.stockSources.variantQuantities.toString(),
-      },
-      {
-        header: "Stato",
-        cell: (p) =>
-          `<div class="status-cell"><span class="status-tag ${
-            p.is_excluded
-              ? "status-excluded"
-              : p.stockSources.agreementStatus !== "MATCH"
-              ? "status-warning"
-              : "status-info"
-          }">${
-            p.is_excluded
-              ? "ESCLUSO"
-              : p.stockSources.agreementStatus !== "MATCH"
-              ? "DISCREPANZA"
-              : "DA AGGIORNARE"
-          }</span></div>`,
-      },
-    ]);
+    const productsWithNoStock = products.filter(
+      (product) => product.totalStock <= 0
+    );
+    body += renderTable(
+      "Prodotti che verrebbero modificati",
+      productsWithNoStock,
+      [
+        {
+          header: "Prodotto",
+          cell: (p) => `<a href="${adminUrl}/products/${p.id}">${p.title}</a>`,
+        },
+        { header: "ID", cell: (p) => p.id },
+        { header: "Stock Finale", cell: (p) => p.totalStock.toString() },
+        {
+          header: "Stock API",
+          cell: (p) => p.stockSources.inventoryLevels.toString(),
+        },
+        {
+          header: "Stock Varianti",
+          cell: (p) => p.stockSources.variantQuantities.toString(),
+        },
+        {
+          header: "Stato",
+          cell: (p) =>
+            `<div class="status-cell"><span class="status-tag ${
+              p.is_excluded ? "status-excluded" : "status-info"
+            }">${p.is_excluded ? "ESCLUSO" : "DA AGGIORNARE"}</span></div>`,
+        },
+      ]
+    );
   } else {
     const updated = updateResults.filter((r) => r.success && !r.error);
     const failed = updateResults.filter((r) => !r.success);
@@ -622,9 +675,9 @@ function generateHtmlReport(
     }
   }
 
-  if (summary.total_found === 0) {
+  if (summary.eligible_count === 0 && summary.negative_stock_count === 0) {
     body +=
-      '<h2>Risultato</h2><p style="text-align:center; font-size: 1.2em;">✅ Tutto in ordine! Nessun prodotto attivo con scorte esaurite trovato.</p>';
+      '<h2>Risultato</h2><p style="text-align:center; font-size: 1.2em;">✅ Tutto in ordine! Nessun prodotto con problemi di inventario trovato.</p>';
   }
 
   body +=
@@ -678,6 +731,7 @@ DESCRIPTION:
     - Better error handling and discrepancy detection
     - Enhanced reporting with source comparison
     - Detailed product lists in dry-run mode
+    - Detection and reporting of products with negative inventory quantities
 
 USAGE:
     npx tsx scripts/stock-manager.ts [OPTIONS]
@@ -774,6 +828,31 @@ async function main() {
       );
     }
 
+    const productsWithNegativeStock = findProductsWithNegativeStock(
+      productStockInfos
+    ).filter((p) => !p.is_excluded);
+    if (productsWithNegativeStock.length > 0) {
+      log(
+        `\n🚨 Found ${productsWithNegativeStock.length} products with negative variant quantities (inventory errors):`
+      );
+      productsWithNegativeStock.forEach((product, index) => {
+        const negativeVariants = product.variants.filter(
+          (v) => v.variantQuantityStock < 0
+        );
+        log(`   ${index + 1}. "${product.title}" (ID: ${product.id})`);
+        negativeVariants.forEach((variant) => {
+          log(
+            `      🔴 Variant "${variant.title}" (SKU: ${
+              variant.sku || "No SKU"
+            }): ${variant.variantQuantityStock}`
+          );
+        });
+      });
+      log(
+        "   💡 These inventory errors should be corrected manually in Shopify admin."
+      );
+    }
+
     let updateResults: UpdateResult[] = [];
     if (!dryRun && productsWithNoStock.length > 0) {
       log("\n📝 Updating products to draft status...");
@@ -784,10 +863,10 @@ async function main() {
       );
     }
 
-    const summary = generateSummary(productsWithNoStock, updateResults, dryRun);
+    const summary = generateSummary(productStockInfos, updateResults, dryRun);
     const htmlReport = generateHtmlReport(
       summary,
-      productsWithNoStock,
+      productStockInfos,
       updateResults,
       dryRun,
       config.shopDomain
@@ -808,6 +887,11 @@ async function main() {
     if (summary.discrepancies_found > 0) {
       log(
         `📊 Found ${summary.discrepancies_found} data source discrepancies - check the report for details`
+      );
+    }
+    if (summary.negative_stock_count > 0) {
+      log(
+        `🚨 Found ${summary.negative_stock_count} products with negative inventory quantities - these require manual correction`
       );
     }
   } catch (error: any) {
