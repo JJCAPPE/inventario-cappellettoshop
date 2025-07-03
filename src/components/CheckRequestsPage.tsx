@@ -25,7 +25,8 @@ import {
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/it";
-import TauriAPI, { CheckRequest } from "../services/tauri";
+import TauriAPI from "../services/tauri";
+import { CheckRequestWithId } from "../types/index";
 import CheckRequestActionModal from "./CheckRequestActionModal";
 
 // Configure dayjs
@@ -43,8 +44,10 @@ interface CheckRequestsPageProps {
 const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
   onNavigateToProduct,
 }) => {
-  const [checkRequests, setCheckRequests] = useState<CheckRequest[]>([]);
-  const [filteredRequests, setFilteredRequests] = useState<CheckRequest[]>([]);
+  const [checkRequests, setCheckRequests] = useState<CheckRequestWithId[]>([]);
+  const [filteredRequests, setFilteredRequests] = useState<
+    CheckRequestWithId[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,9 +60,8 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(
     null
   );
-  const [selectedRequest, setSelectedRequest] = useState<CheckRequest | null>(
-    null
-  );
+  const [selectedRequest, setSelectedRequest] =
+    useState<CheckRequestWithId | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
 
   // Get current location for filtering
@@ -201,7 +203,7 @@ const CheckRequestsPage: React.FC<CheckRequestsPageProps> = ({
     }
   };
 
-  const handleRequestClick = (request: CheckRequest) => {
+  const handleRequestClick = (request: CheckRequestWithId) => {
     if (request.status === "pending") {
       setSelectedRequest(request);
       setActionModalVisible(true);

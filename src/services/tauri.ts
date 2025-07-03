@@ -9,7 +9,7 @@ import type {
   LocationInfo,
   FirebaseConfig,
   LogData,
-  CheckRequest,
+  CheckRequestWithId,
 } from "../types/index";
 import { message } from "antd";
 
@@ -649,9 +649,11 @@ export class FirebaseAPI {
   /**
    * Get check requests from Firebase filtered by location
    */
-  static async getCheckRequests(location: string): Promise<CheckRequest[]> {
+  static async getCheckRequests(
+    location: string
+  ): Promise<CheckRequestWithId[]> {
     try {
-      const result = await invoke<CheckRequest[]>("get_check_requests", {
+      const result = await invoke<CheckRequestWithId[]>("get_check_requests", {
         location,
       });
       console.log(

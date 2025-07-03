@@ -16,8 +16,8 @@ import {
   InfoCircleOutlined,
   DatabaseOutlined,
 } from "@ant-design/icons";
-import { CheckRequest } from "../services/tauri";
 import TauriAPI from "../services/tauri";
+import { CheckRequestWithId } from "../types/index";
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
@@ -26,7 +26,7 @@ const { TextArea } = Input;
 interface CheckRequestActionModalProps {
   open: boolean;
   onClose: () => void;
-  checkRequest: CheckRequest;
+  checkRequest: CheckRequestWithId;
   onRequestUpdated: () => void;
   onNavigateToProduct?: (productId: string) => void;
 }
@@ -210,7 +210,7 @@ const CheckRequestActionModal: React.FC<CheckRequestActionModalProps> = ({
             <div>
               <Text strong>Posizioni: </Text>
               <Space>
-                {checkRequest.location.map((loc) => (
+                {checkRequest.location.map((loc: string) => (
                   <Tag key={loc} color="blue">
                     {loc}
                   </Tag>
