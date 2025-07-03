@@ -1,9 +1,9 @@
-name: Daily Stock Check
+name: Weekly Stock Check
 
 on:
   schedule:
-    # Runs every day at midnight UTC.
-    - cron: "0 0 * * *"
+    # Runs every Sunday at midnight UTC.
+    - cron: "0 0 * * 0"
   workflow_dispatch: # Allows manual triggering from the Actions tab
 
 jobs:
