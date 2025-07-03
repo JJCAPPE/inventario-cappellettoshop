@@ -757,7 +757,7 @@ const HomePage: React.FC<HomePageProps> = ({
               }}
             >
               {/* Primary Location Variants */}
-              <Col span={secondaryPanelExpanded ? 8 : 18}>
+              <Col span={secondaryPanelExpanded ? 12 : 18}>
                 <Card
                   title={
                     <div
@@ -894,7 +894,7 @@ const HomePage: React.FC<HomePageProps> = ({
               </Col>
 
               {/* Secondary Location Variants */}
-              <Col span={secondaryPanelExpanded ? 16 : 6}>
+              <Col span={secondaryPanelExpanded ? 12 : 6}>
                 <Card
                   style={{ height: "100%" }}
                   title={
