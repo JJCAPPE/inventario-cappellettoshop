@@ -2,8 +2,8 @@ name: Daily Stock Check
 
 on:
   schedule:
-    # Runs at 12:00 UTC (e.g., 2:00 PM CET during summer) every two days.
-    - cron: "0 12 */2 * *"
+    # Runs every day at midnight UTC.
+    - cron: "0 0 * * *"
   workflow_dispatch: # Allows manual triggering from the Actions tab
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20" # Or your project's specific version
+          node-version: "24" # Or your project's specific version
           cache: "npm"
 
       - name: Install dependencies
@@ -32,4 +32,5 @@ jobs:
           EMAIL_SERVER_USER: ${{ secrets.EMAIL_SERVER_USER }}
           EMAIL_SERVER_PASSWORD: ${{ secrets.EMAIL_SERVER_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-        run: npm run stock:update -- --silent
+        run: npm run stock:update
+
