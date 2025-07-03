@@ -154,16 +154,16 @@ const HomePage: React.FC<HomePageProps> = ({
     };
   }, []);
 
-  // Clear selected variant if it has zero inventory
+  // Clear selected variant if it has zero or negative inventory
   useEffect(() => {
     if (selectedVariant && productDetails) {
       const variantObj = productDetails.varaintiArticolo.find(
         (v) => v.title === selectedVariant
       );
 
-      if (!variantObj || variantObj.inventory_quantity === 0) {
+      if (!variantObj || variantObj.inventory_quantity <= 0) {
         console.log(
-          `🚫 Clearing selected variant '${selectedVariant}' because it has zero inventory`
+          `🚫 Clearing selected variant '${selectedVariant}' because it has zero or negative inventory`
         );
         setSelectedVariant(null);
       }
@@ -366,7 +366,7 @@ const HomePage: React.FC<HomePageProps> = ({
           setSelectedVariant(frontendVariant.title);
         } else if (frontendVariant) {
           console.log(
-            "⚠️ HomePage: Found SKU variant but it has zero inventory:",
+            "⚠️ HomePage: Found SKU variant but it has zero or negative inventory:",
             frontendVariant.title
           );
         }
@@ -380,7 +380,18 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleVariantSelect = (variant: string) => {
-    // Always allow selection, even if variant has zero inventory
+    // Check if the variant has negative inventory and prevent selection
+    const variantObj = productDetails?.varaintiArticolo.find(
+      (v) => v.title === variant
+    );
+
+    if (variantObj && variantObj.inventory_quantity < 0) {
+      message.warning(
+        `La taglia ${variant} ha quantità negativa. Non è possibile selezionarla.`
+      );
+      return;
+    }
+
     setSelectedVariant(variant);
   };
 
@@ -397,9 +408,10 @@ const HomePage: React.FC<HomePageProps> = ({
       return;
     }
 
-    if (variant.inventory_quantity === 0) {
+    if (variant.inventory_quantity <= 0) {
+      const quantityText = variant.inventory_quantity === 0 ? "0" : "negativa";
       message.warning(
-        `La taglia ${selectedVariant} ha già quantità 0. Non è possibile ridurla ulteriormente.`
+        `La taglia ${selectedVariant} ha già quantità ${quantityText}. Non è possibile ridurla ulteriormente.`
       );
       return;
     }
@@ -784,7 +796,7 @@ const HomePage: React.FC<HomePageProps> = ({
                     split={false}
                     dataSource={productDetails.varaintiArticolo}
                     renderItem={(variant) => {
-                      const isOutOfStock = variant.inventory_quantity === 0;
+                      const isOutOfStock = variant.inventory_quantity <= 0;
                       const isSelected = selectedVariant === variant.title;
 
                       return (
@@ -948,7 +960,7 @@ const HomePage: React.FC<HomePageProps> = ({
                         size="small"
                         dataSource={secondaryProductDetails.availableVariants}
                         renderItem={(variant) => {
-                          const isOutOfStock = variant.inventory_quantity === 0;
+                          const isOutOfStock = variant.inventory_quantity <= 0;
 
                           return (
                             <List.Item
@@ -1040,10 +1052,10 @@ const HomePage: React.FC<HomePageProps> = ({
                                   (sv) => sv.title === primaryVariant.title
                                 );
 
-                              // Check if out of stock (either missing or 0 quantity)
+                              // Check if out of stock (either missing or 0/negative quantity)
                               const isOutOfStock =
                                 !secondaryVariant ||
-                                secondaryVariant.inventory_quantity === 0;
+                                secondaryVariant.inventory_quantity <= 0;
 
                               return (
                                 <div
