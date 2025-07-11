@@ -766,6 +766,8 @@ const HomePage: React.FC<HomePageProps> = ({
                   setQuery={setQuery}
                   onSelect={handleSearchSelect}
                   onAutoSelect={handleSearchSelect}
+                  sortKey={searchSortKey}
+                  sortReverse={searchSortReverse}
                 />
               </div>
 
@@ -1445,7 +1447,7 @@ const HomePage: React.FC<HomePageProps> = ({
                 <Text strong>Ordine Invertito</Text>
                 <br />
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {searchSortReverse
+                  {pendingSearchSortReverse
                     ? "Dal più alto al più basso"
                     : "Dal più basso al più alto"}
                 </Text>
