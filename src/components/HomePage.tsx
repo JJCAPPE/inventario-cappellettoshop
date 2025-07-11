@@ -115,19 +115,8 @@ const HomePage: React.FC<HomePageProps> = ({
   );
   const [secondaryPanelExpanded, setSecondaryPanelExpanded] = useState(false);
 
-  // Add state for pending settings changes
-  const [pendingPrimaryLocation, setPendingPrimaryLocation] =
-    useState<LocationName>(LOCATION_CONFIG.defaultPrimary);
-  const [pendingSearchSortKey, setPendingSearchSortKey] =
-    useState<string>("RELEVANCE");
-  const [pendingSearchSortReverse, setPendingSearchSortReverse] =
-    useState<boolean>(false);
-  const [isSettingsSaving, setIsSettingsSaving] = useState(false);
-
   // Add transfer mode state
   const [transferModeEnabled, setTransferModeEnabled] =
-    useState<boolean>(false);
-  const [pendingTransferModeEnabled, setPendingTransferModeEnabled] =
     useState<boolean>(false);
   const [isTransferLoading, setIsTransferLoading] = useState(false);
   const [lastTransferredVariant, setLastTransferredVariant] = useState<
@@ -144,7 +133,6 @@ const HomePage: React.FC<HomePageProps> = ({
     if (savedLocation && LOCATION_CONFIG.isValidLocation(savedLocation)) {
       setPrimaryLocation(savedLocation);
       setSecondaryLocation(LOCATION_CONFIG.getSecondaryLocation(savedLocation));
-      setPendingPrimaryLocation(savedLocation); // Initialize pending state
     }
 
     // Load saved search sort preference from localStorage
@@ -156,21 +144,18 @@ const HomePage: React.FC<HomePageProps> = ({
       )
     ) {
       setSearchSortKey(savedSortKey);
-      setPendingSearchSortKey(savedSortKey); // Initialize pending state
     }
 
     // Load saved search sort reverse preference from localStorage
     const savedSortReverse = localStorage.getItem("searchSortReverse");
     if (savedSortReverse !== null) {
       setSearchSortReverse(savedSortReverse === "true");
-      setPendingSearchSortReverse(savedSortReverse === "true"); // Initialize pending state
     }
 
     // Load saved transfer mode preference from localStorage
     const savedTransferMode = localStorage.getItem("transferModeEnabled");
     if (savedTransferMode !== null) {
       setTransferModeEnabled(savedTransferMode === "true");
-      setPendingTransferModeEnabled(savedTransferMode === "true"); // Initialize pending state
     }
 
     // Add keyboard shortcut listener for Cmd+, (settings)
@@ -233,42 +218,68 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   }, [triggerSettingsModal, onSettingsTriggered, onSettingsOpen]);
 
-  // Reset pending settings when modal opens
-  useEffect(() => {
-    if (settingsModalVisible) {
-      console.log(
-        "⚙️ Settings modal opened - resetting pending values to current values"
-      );
-      setPendingPrimaryLocation(primaryLocation);
-      setPendingSearchSortKey(searchSortKey);
-      setPendingSearchSortReverse(searchSortReverse);
-      setPendingTransferModeEnabled(transferModeEnabled);
-    }
-  }, [
-    settingsModalVisible,
-    primaryLocation,
-    searchSortKey,
-    searchSortReverse,
-    transferModeEnabled,
-  ]);
-
-  // Update pending settings functions (don't apply immediately)
-  const handlePendingLocationChange = (newPrimaryLocation: string) => {
+  // Immediate settings change handlers (apply changes immediately)
+  const handleLocationChange = async (newPrimaryLocation: string) => {
     if (LOCATION_CONFIG.isValidLocation(newPrimaryLocation)) {
-      setPendingPrimaryLocation(newPrimaryLocation);
+      console.log(
+        `⚙️ Changing primary location from ${primaryLocation} to ${newPrimaryLocation}`
+      );
+
+      // Apply the location change immediately
+      setPrimaryLocation(newPrimaryLocation);
+      setSecondaryLocation(
+        LOCATION_CONFIG.getSecondaryLocation(newPrimaryLocation)
+      );
+
+      // Save to localStorage
+      localStorage.setItem("primaryLocation", newPrimaryLocation);
+
+      // Show success message
+      message.success(`Posizione principale cambiata a ${newPrimaryLocation}`);
+
+      // Refresh product data if there's a current product
+      if (productDetails) {
+        console.log("🔄 Refreshing product data for new location...");
+        await refreshProductWithNewLocation(newPrimaryLocation);
+      }
     }
   };
 
-  const handlePendingSearchSortChange = (newSortKey: string) => {
-    setPendingSearchSortKey(newSortKey);
+  const handleSearchSortChange = (newSortKey: string) => {
+    console.log(`⚙️ Changing search sort key to ${newSortKey}`);
+    setSearchSortKey(newSortKey);
+    localStorage.setItem("searchSortKey", newSortKey);
+
+    const sortLabels = {
+      RELEVANCE: "Rilevanza",
+      UPDATED_AT: "Aggiornati Recentemente",
+      CREATED_AT: "Creati Recentemente",
+      INVENTORY_TOTAL: "Quantità Totale",
+    };
+
+    message.success(
+      `Ordine Risultati Ricerca: ${
+        sortLabels[newSortKey as keyof typeof sortLabels]
+      }`
+    );
   };
 
-  const handlePendingSearchSortReverseChange = (reverse: boolean) => {
-    setPendingSearchSortReverse(reverse);
+  const handleSearchSortReverseChange = (reverse: boolean) => {
+    console.log(`⚙️ Changing search sort reverse to ${reverse}`);
+    setSearchSortReverse(reverse);
+    localStorage.setItem("searchSortReverse", reverse.toString());
+
+    const orderText = reverse ? "Decrescente" : "Crescente";
+    message.success(`Ordine risultati: ${orderText}`);
   };
 
-  const handlePendingTransferModeChange = (enabled: boolean) => {
-    setPendingTransferModeEnabled(enabled);
+  const handleTransferModeChange = (enabled: boolean) => {
+    console.log(`⚙️ Changing transfer mode to ${enabled}`);
+    setTransferModeEnabled(enabled);
+    localStorage.setItem("transferModeEnabled", enabled.toString());
+
+    const statusText = enabled ? "attivata" : "disattivata";
+    message.success(`Modalità Trasferimenti ${statusText}`);
   };
 
   // Function to refresh current product data with new location
@@ -308,92 +319,6 @@ const HomePage: React.FC<HomePageProps> = ({
       console.error("❌ Error refreshing product with new location:", error);
       message.error("Errore nell'aggiornamento del prodotto");
     }
-  };
-
-  const handleSettingsOk = async () => {
-    setIsSettingsSaving(true);
-
-    try {
-      // Check if location changed
-      const locationChanged = pendingPrimaryLocation !== primaryLocation;
-
-      // Apply all pending changes
-      setPrimaryLocation(pendingPrimaryLocation);
-      setSecondaryLocation(
-        LOCATION_CONFIG.getSecondaryLocation(pendingPrimaryLocation)
-      );
-      setSearchSortKey(pendingSearchSortKey);
-      setSearchSortReverse(pendingSearchSortReverse);
-      setTransferModeEnabled(pendingTransferModeEnabled);
-
-      // Save to localStorage
-      localStorage.setItem("primaryLocation", pendingPrimaryLocation);
-      localStorage.setItem("searchSortKey", pendingSearchSortKey);
-      localStorage.setItem(
-        "searchSortReverse",
-        pendingSearchSortReverse.toString()
-      );
-      localStorage.setItem(
-        "transferModeEnabled",
-        pendingTransferModeEnabled.toString()
-      );
-
-      // Show success messages for what changed
-      if (locationChanged) {
-        message.success(
-          `Posizione principale cambiata a ${pendingPrimaryLocation}`
-        );
-
-        // Refresh product data if location changed and there's a current product
-        if (productDetails) {
-          await refreshProductWithNewLocation(pendingPrimaryLocation);
-        }
-      }
-
-      if (pendingSearchSortKey !== searchSortKey) {
-        const sortLabels = {
-          RELEVANCE: "Rilevanza",
-          UPDATED_AT: "Aggiornati Recentemente",
-          CREATED_AT: "Creati Recentemente",
-          INVENTORY_TOTAL: "Quantità Totale",
-        };
-
-        message.success(
-          `Ordine Risultati Ricerca: ${
-            sortLabels[pendingSearchSortKey as keyof typeof sortLabels]
-          }`
-        );
-      }
-
-      if (pendingSearchSortReverse !== searchSortReverse) {
-        const orderText = pendingSearchSortReverse
-          ? "Decrescente"
-          : "Crescente";
-        message.success(`Ordine risultati: ${orderText}`);
-      }
-
-      if (pendingTransferModeEnabled !== transferModeEnabled) {
-        const statusText = pendingTransferModeEnabled
-          ? "attivata"
-          : "disattivata";
-        message.success(`Modalità Trasferimenti ${statusText}`);
-      }
-    } catch (error) {
-      console.error("❌ Error applying settings:", error);
-      message.error("Errore nell'applicazione delle impostazioni");
-    } finally {
-      setIsSettingsSaving(false);
-      onSettingsClose?.();
-    }
-  };
-
-  const handleSettingsCancel = () => {
-    // Reset pending values to current values
-    setPendingPrimaryLocation(primaryLocation);
-    setPendingSearchSortKey(searchSortKey);
-    setPendingSearchSortReverse(searchSortReverse);
-    setPendingTransferModeEnabled(transferModeEnabled);
-    onSettingsClose?.();
   };
 
   const handleSearchSelect = async (id: string, searchQuery: string) => {
@@ -1730,11 +1655,8 @@ const HomePage: React.FC<HomePageProps> = ({
           </Space>
         }
         open={settingsModalVisible}
-        onOk={handleSettingsOk}
-        onCancel={handleSettingsCancel}
-        okText="Salva"
-        cancelText="Annulla"
-        confirmLoading={isSettingsSaving}
+        onCancel={onSettingsClose}
+        footer={null}
         width={700}
       >
         <div style={{ padding: "16px 0" }}>
@@ -1751,8 +1673,8 @@ const HomePage: React.FC<HomePageProps> = ({
               </Text>
 
               <Radio.Group
-                value={pendingPrimaryLocation}
-                onChange={(e) => handlePendingLocationChange(e.target.value)}
+                value={primaryLocation}
+                onChange={(e) => handleLocationChange(e.target.value)}
                 style={{ width: "100%", marginBottom: 24 }}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>
@@ -1764,11 +1686,11 @@ const HomePage: React.FC<HomePageProps> = ({
                     >
                       <Space>
                         <span>{location}</span>
-                        {pendingPrimaryLocation === location && (
+                        {primaryLocation === location && (
                           <Tag color="blue">Principale</Tag>
                         )}
                         {LOCATION_CONFIG.getSecondaryLocation(
-                          pendingPrimaryLocation
+                          primaryLocation
                         ) === location && <Tag color="default">Secondario</Tag>}
                       </Space>
                     </Radio>
@@ -1794,14 +1716,14 @@ const HomePage: React.FC<HomePageProps> = ({
                     <Text strong>Abilita Trasferimenti</Text>
                     <br />
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      {pendingTransferModeEnabled
+                      {transferModeEnabled
                         ? "Modalità trasferimenti attiva"
                         : "Modalità trasferimenti disattiva"}
                     </Text>
                   </div>
                   <Switch
-                    checked={pendingTransferModeEnabled}
-                    onChange={handlePendingTransferModeChange}
+                    checked={transferModeEnabled}
+                    onChange={handleTransferModeChange}
                     checkedChildren="✓"
                     unCheckedChildren="✗"
                   />
@@ -1821,8 +1743,8 @@ const HomePage: React.FC<HomePageProps> = ({
               </Text>
 
               <Radio.Group
-                value={pendingSearchSortKey}
-                onChange={(e) => handlePendingSearchSortChange(e.target.value)}
+                value={searchSortKey}
+                onChange={(e) => handleSearchSortChange(e.target.value)}
                 style={{ width: "100%" }}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>
@@ -1864,14 +1786,14 @@ const HomePage: React.FC<HomePageProps> = ({
                     <Text strong>Ordine Invertito</Text>
                     <br />
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      {pendingSearchSortReverse
+                      {searchSortReverse
                         ? "Dal più alto al più basso"
                         : "Dal più basso al più alto"}
                     </Text>
                   </div>
                   <Switch
-                    checked={pendingSearchSortReverse}
-                    onChange={handlePendingSearchSortReverseChange}
+                    checked={searchSortReverse}
+                    onChange={handleSearchSortReverseChange}
                     checkedChildren="↓"
                     unCheckedChildren="↑"
                   />
