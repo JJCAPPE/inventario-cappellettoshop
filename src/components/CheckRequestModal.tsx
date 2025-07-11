@@ -147,7 +147,7 @@ const CheckRequestModal: React.FC<CheckRequestModalProps> = ({
       cancelText="Annulla"
       confirmLoading={loading}
       width={600}
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: 24 }}>
         <Title level={4} style={{ margin: 0 }}>

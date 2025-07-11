@@ -491,6 +491,53 @@ export class InventoryAPI {
       throw new Error(`Failed to get modification history: ${error}`);
     }
   }
+
+  /**
+   * Transfer inventory between locations and log to Firebase
+   */
+  static async transferInventoryBetweenLocations(
+    inventoryItemId: string,
+    fromLocationId: string,
+    toLocationId: string,
+    productId: string,
+    variantTitle: string,
+    productName: string,
+    price: string,
+    fromLocation: string,
+    toLocation: string,
+    images: string[]
+  ): Promise<EnhancedStatusResponse> {
+    try {
+      const result = await invoke<EnhancedStatusResponse>(
+        "transfer_inventory_between_locations",
+        {
+          inventoryItemId,
+          fromLocationId,
+          toLocationId,
+          productId,
+          variantTitle,
+          productName,
+          price,
+          fromLocation,
+          toLocation,
+          images,
+        }
+      );
+
+      console.log(
+        `🔍 Raw API Response - transfer_inventory_between_locations:`,
+        result
+      );
+      console.log(
+        `📝 Transferred inventory for ${productName} (${variantTitle}) from ${fromLocation} to ${toLocation}`
+      );
+
+      return result;
+    } catch (error) {
+      console.error("Error transferring inventory between locations:", error);
+      throw new Error(`Failed to transfer inventory: ${error}`);
+    }
+  }
 }
 
 // Firebase API functions

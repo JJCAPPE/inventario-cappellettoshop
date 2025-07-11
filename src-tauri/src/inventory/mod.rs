@@ -483,6 +483,171 @@ pub async fn undo_decrease_inventory_with_logging(
     })
 }
 
+/// Transfer inventory between two locations and log to Firebase  
+#[tauri::command]
+pub async fn transfer_inventory_between_locations(
+    inventory_item_id: String,
+    from_location_id: String,
+    to_location_id: String,
+    product_id: String,
+    variant_title: String,
+    product_name: String,
+    price: String,
+    from_location: String,
+    to_location: String,
+    images: Vec<String>,
+    config: tauri::State<'_, AppConfig>,
+) -> Result<EnhancedStatusResponse, String> {
+    println!(
+        "🔄 Starting inventory transfer for product: {} ({})",
+        product_name, variant_title
+    );
+    println!("📦 Inventory item ID: {}", inventory_item_id);
+    println!(
+        "📍 From location: {} (ID: {})",
+        from_location, from_location_id
+    );
+    println!("📍 To location: {} (ID: {})", to_location, to_location_id);
+
+    // Note: Inventory validation is handled by the frontend (same logic as variant selection)
+    // The frontend ensures only variants with stock > 0 in the primary location can be transferred
+
+    // Step 4: Execute the transfer (decrease from source, increase at destination)
+    println!("📉 Decreasing inventory at source location...");
+    let decrease_update = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: from_location_id.clone(),
+        adjustment: -1,
+    };
+
+    let from_result = adjust_inventory(config.clone(), vec![decrease_update]).await;
+
+    if let Err(e) = from_result {
+        return Err(format!(
+            "Errore nella rimozione da {}: {}",
+            from_location, e
+        ));
+    }
+
+    println!("📈 Increasing inventory at destination location...");
+    let increase_update = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: to_location_id.clone(),
+        adjustment: 1,
+    };
+
+    let to_result = adjust_inventory(config.clone(), vec![increase_update]).await;
+
+    if let Err(e) = to_result {
+        // Rollback: restore the source location inventory
+        println!("❌ Error at destination, rolling back source location...");
+        let rollback_update = InventoryUpdate {
+            variant_id: inventory_item_id.clone(),
+            location_id: from_location_id.clone(),
+            adjustment: 1,
+        };
+        let rollback_result = adjust_inventory(config.clone(), vec![rollback_update]).await;
+
+        if let Err(rollback_err) = rollback_result {
+            return Err(format!(
+                "ERRORE CRITICO: Fallimento trasferimento e rollback fallito. Originale: {}, Rollback: {}",
+                e, rollback_err
+            ));
+        }
+        return Err(format!("Errore nell'aggiunta a {}: {}", to_location, e));
+    }
+
+    println!("✅ Inventory transfer successful");
+
+    // Step 5: Create Firebase log entries (one for each location)
+    let firebase_client = FirebaseClient::new(config.inner().clone());
+
+    // Log entry for source location (negative adjustment)
+    let source_log_data = crate::firebase::LogData {
+        id: product_id.clone(),
+        variant: variant_title.clone(),
+        negozio: from_location.clone(),
+        inventory_item_id: inventory_item_id.clone(),
+        nome: product_name.clone(),
+        prezzo: price.clone(),
+        rettifica: -1, // Negative 1 for removal from source
+        images: images.clone(),
+    };
+
+    println!("📝 Creating Firebase log for source location (removal)");
+    let source_log_entry = crate::firebase::LogEntry {
+        request_type: "Trasferimento".to_string(),
+        data: source_log_data,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+
+    let source_log_result = firebase_client.create_log(source_log_entry).await;
+
+    if let Err(e) = source_log_result {
+        println!("⚠️ Warning: Failed to log source transfer: {}", e);
+        // Don't fail the entire operation for logging issues, but warn
+    }
+
+    // Log entry for destination location (positive adjustment)
+    let dest_log_data = crate::firebase::LogData {
+        id: product_id.clone(),
+        variant: variant_title.clone(),
+        negozio: to_location.clone(),
+        inventory_item_id: inventory_item_id.clone(),
+        nome: product_name.clone(),
+        prezzo: price.clone(),
+        rettifica: 1, // Positive 1 for addition to destination
+        images: images.clone(),
+    };
+
+    println!("📝 Creating Firebase log for destination location (addition)");
+    let dest_log_entry = crate::firebase::LogEntry {
+        request_type: "Trasferimento".to_string(),
+        data: dest_log_data,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+
+    let dest_log_result = firebase_client.create_log(dest_log_entry).await;
+
+    if let Err(e) = dest_log_result {
+        println!("⚠️ Warning: Failed to log destination transfer: {}", e);
+        // Don't fail the entire operation for logging issues, but warn
+    }
+
+    println!("✅ Firebase logs created successfully for transfer");
+
+    // Step 6: Check if product status needs to change due to inventory levels
+    let status_changed = match has_zero_inventory_across_all_locations(&config, &product_id).await {
+        Ok(true) => {
+            println!("🔄 Product has zero inventory across all locations, setting to draft");
+            update_product_status(&config, &product_id, "draft").await?;
+            Some("to_draft".to_string())
+        }
+        Ok(false) => {
+            println!("✅ Product still has inventory in some locations");
+            None
+        }
+        Err(e) => {
+            println!(
+                "⚠️ Warning: Could not check product inventory status: {}",
+                e
+            );
+            None
+        }
+    };
+
+    // Return enhanced response with status change information
+    Ok(EnhancedStatusResponse {
+        status: "success".to_string(),
+        message: format!(
+            "Trasferimento completato: {} ({}) spostato da {} a {}",
+            product_name, variant_title, from_location, to_location
+        ),
+        status_changed,
+        product_status: None, // We don't fetch current status for transfers
+    })
+}
+
 #[tauri::command]
 pub async fn get_product_modification_history(
     product_id: String,

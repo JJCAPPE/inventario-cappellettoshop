@@ -8,6 +8,9 @@ interface SearchBarProps {
   setQuery: (query: string) => void;
   onSelect: (id: string, query: string) => void;
   onAutoSelect?: (id: string, query: string) => void;
+  sortKey?: string;
+  sortReverse?: boolean;
+  onNavigateHistory?: (direction: "up" | "down") => string | null;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -15,6 +18,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
   setQuery,
   onSelect,
   onAutoSelect,
+  sortKey = "RELEVANCE",
+  sortReverse = false,
+  onNavigateHistory,
 }) => {
   const [options, setOptions] = useState<
     Array<{ value: string; label: React.ReactNode }>
@@ -34,44 +40,64 @@ const SearchBar: React.FC<SearchBarProps> = ({
     setLoading(true);
     setSearchStatus(""); // Reset status while searching
     try {
-      console.log("🚀 SearchBar: Starting enhanced search for:", searchQuery);
+      console.log("🚀 SearchBar: Starting search for:", searchQuery);
+      console.log("📊 Using sort:", sortKey, "reverse:", sortReverse);
 
-      // Use the new enhanced search that handles SKU-first logic
-      const products = await TauriAPI.Product.enhancedSearchProducts(
-        searchQuery
-      );
+      let products = [];
+
+      // First, try exact SKU matching (this should be fast and exact)
+      console.log("🔍 SearchBar: Checking for exact SKU match");
+      const exactSkuResult =
+        await TauriAPI.Product.findProductByExactSkuGraphQL(searchQuery.trim());
+
+      if (exactSkuResult) {
+        console.log(
+          "✅ SearchBar: Found exact SKU match:",
+          exactSkuResult.product.title
+        );
+        products = [exactSkuResult.product];
+      } else {
+        // If no exact SKU match, search by name with sorting
+        console.log(
+          "🔍 SearchBar: No exact SKU match, searching by name with sorting"
+        );
+        products = await TauriAPI.Product.searchProductsByNameGraphQL(
+          searchQuery,
+          sortKey,
+          sortReverse
+        );
+        console.log(
+          `✅ SearchBar: Name search returned ${products.length} products (sorted by ${sortKey}, reverse: ${sortReverse})`
+        );
+      }
 
       console.log(
-        "✅ SearchBar: Enhanced search returned",
+        "✅ SearchBar: Total search results:",
         products.length,
         "products"
       );
 
-      // Auto-select logic: select immediately if only one result is found
-      if (products.length === 1 && onAutoSelect) {
-        const product = products[0];
-
-        // Check if it's an exact SKU match first
-        const matchingVariant = product.variants.find(
-          (v) =>
-            v.sku && v.sku.toLowerCase() === searchQuery.trim().toLowerCase()
-        );
-
-        if (matchingVariant) {
+      // Auto-select logic: select immediately if exact SKU match or only one result
+      if (onAutoSelect) {
+        if (exactSkuResult) {
+          // Auto-select for exact SKU match
           console.log(
             "✅ SearchBar: Exact SKU match found, auto-selecting:",
-            product.title
+            exactSkuResult.product.title
           );
-        } else {
+          onAutoSelect(exactSkuResult.product.id, searchQuery);
+          setOptions([]);
+          return;
+        } else if (products.length === 1) {
+          // Auto-select for single search result
           console.log(
             "✅ SearchBar: Only one search result found, auto-selecting:",
-            product.title
+            products[0].title
           );
+          onAutoSelect(products[0].id, searchQuery);
+          setOptions([]);
+          return;
         }
-
-        onAutoSelect(product.id, searchQuery);
-        setOptions([]);
-        return;
       }
 
       // Process all products for display
@@ -179,13 +205,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (query) {
-        console.log(`⏰ SearchBar: Debounced search triggered for: "${query}"`);
+        console.log(
+          `⏰ SearchBar: Debounced search triggered for: "${query}" with sort: ${sortKey}, reverse: ${sortReverse}`
+        );
       }
       searchProducts(query);
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [query]);
+  }, [query, sortKey, sortReverse]);
 
   const handleSelect = (value: string) => {
     // Don't handle error or no-results selections
@@ -196,6 +224,24 @@ const SearchBar: React.FC<SearchBarProps> = ({
     if (selectedOption) {
       console.log("✅ SearchBar: Calling onSelect with query:", query);
       onSelect(value, query);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!onNavigateHistory) return;
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const historyQuery = onNavigateHistory("up");
+      if (historyQuery !== null) {
+        setQuery(historyQuery);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const historyQuery = onNavigateHistory("down");
+      if (historyQuery !== null) {
+        setQuery(historyQuery);
+      }
     }
   };
 
@@ -216,6 +262,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         suffix={loading ? <Spin size="small" /> : null}
         placeholder="Cerca per nome prodotto o inserisci SKU per selezione automatica..."
         status={searchStatus}
+        onKeyDown={handleKeyDown}
       />
     </AutoComplete>
   );

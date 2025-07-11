@@ -339,7 +339,7 @@ const ModificationHistoryModal: React.FC<ModificationHistoryModalProps> = ({
         onCancel={handleClose}
         footer={null}
         width={900}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 24 }}>
           <Title level={4} style={{ margin: 0 }}>

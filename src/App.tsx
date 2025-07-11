@@ -4,9 +4,9 @@ import {
   Button,
   Drawer,
   ConfigProvider,
-  notification,
   message,
   Modal,
+  App as AntdApp,
 } from "antd";
 
 import {
@@ -14,7 +14,6 @@ import {
   CloseOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
-  RocketOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
@@ -104,6 +103,10 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [triggerSettingsModal, setTriggerSettingsModal] = useState(false);
 
+  // Transfer mode state - default to false (normal mode)
+  const [transferModeEnabled, setTransferModeEnabled] =
+    useState<boolean>(false);
+
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Initialize updater with configuration
@@ -123,6 +126,16 @@ function App() {
 
   useEffect(() => {
     document.title = `Inventario CappellettoShop ${getDisplayVersion()}`;
+
+    // Load saved transfer mode preference from localStorage (default to false = normal mode)
+    const savedTransferMode = localStorage.getItem("transferModeEnabled");
+    if (savedTransferMode !== null) {
+      setTransferModeEnabled(savedTransferMode === "true");
+    } else {
+      // Explicitly set to false and save to localStorage if no preference exists
+      setTransferModeEnabled(false);
+      localStorage.setItem("transferModeEnabled", "false");
+    }
 
     // Set up menu event listeners
     const setupMenuListeners = async () => {
@@ -195,29 +208,13 @@ function App() {
         content: errorMessage,
         duration: 4,
       });
-
-      notification.error({
-        message: "Errore Controllo Aggiornamenti",
-        description: errorMessage,
-        duration: 6,
-        placement: "topRight",
-      });
     }
   };
 
   // Handle update completion
   const handleUpdateCompleted = () => {
     console.log("✅ Update completed successfully from App component");
-
-    // Show celebration notification
-    notification.success({
-      message: "🎉 Aggiornamento Completato!",
-      description:
-        "L'applicazione è stata aggiornata con successo. Tutte le nuove funzionalità sono ora disponibili!",
-      icon: <RocketOutlined style={{ color: "#52c41a" }} />,
-      duration: 10,
-      placement: "topRight",
-    });
+    // No additional notifications - the modal already shows completion status
   };
 
   // Simplified toggle function
@@ -376,341 +373,375 @@ function App() {
     setTriggerSettingsModal(false);
   };
 
+  // Transfer mode change handler
+  const handleTransferModeChange = (enabled: boolean) => {
+    console.log(`⚙️ App: Changing transfer mode to ${enabled}`);
+    setTransferModeEnabled(enabled);
+    localStorage.setItem("transferModeEnabled", enabled.toString());
+  };
+
   return (
     <LogProvider>
       <ConfigProvider theme={customTheme}>
-        <Layout style={{ minHeight: "100vh" }}>
-          <Header
-            className="app-header"
-            style={{
-              position: "fixed",
-              zIndex: 1,
-              width: "100%",
-              background: "#492513",
-              padding: "0 16px",
-              paddingLeft: navigator.platform.includes("Mac") ? "80px" : "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
-              {/* Update Check Button */}
-              <Button
-                icon={
-                  isChecking ? (
-                    <DownloadOutlined />
-                  ) : lastCheckFoundNoUpdate ? (
-                    <CheckCircleOutlined />
-                  ) : (
-                    <DownloadOutlined />
-                  )
-                }
-                onClick={handleManualUpdateCheck}
-                loading={isChecking}
-                style={{
-                  background: "transparent",
-                  borderColor: lastCheckFoundNoUpdate ? "#52c41a" : "#d9d9d9",
-                  color: lastCheckFoundNoUpdate ? "#52c41a" : "#d9d9d9",
-                  transition: "all 0.2s ease",
-                }}
-                title={
-                  isChecking
-                    ? "Controllo aggiornamenti in corso..."
-                    : lastCheckFoundNoUpdate
-                    ? "App aggiornata - Clicca per ricontrollare"
-                    : "Controlla aggiornamenti"
-                }
-              >
-                {isChecking
-                  ? "Controllo..."
-                  : lastCheckFoundNoUpdate
-                  ? ""
-                  : "Aggiornamenti"}
-              </Button>
-
-              <Button
-                className={
-                  sidebarVisible && currentView === "checkRequests"
-                    ? "controlli-button-active"
-                    : ""
-                }
-                icon={<CheckCircleOutlined />}
-                onClick={handleCheckRequestsPanelToggle}
-                style={{
-                  background:
-                    sidebarVisible && currentView === "checkRequests"
-                      ? "#FFE8D1"
-                      : "transparent",
-                  borderColor:
-                    sidebarVisible && currentView === "checkRequests"
-                      ? "#FFE8D1"
-                      : "#d9d9d9",
-                  color:
-                    sidebarVisible && currentView === "checkRequests"
-                      ? "#492513"
-                      : "#d9d9d9",
-                  transition: "all 0.2s ease",
-                }}
-                title={
-                  sidebarVisible && currentView === "checkRequests"
-                    ? "Chiudi pannello richieste"
-                    : "Apri pannello richieste"
-                }
-              >
-                {sidebarVisible && currentView === "checkRequests"
-                  ? "Chiudi Richieste"
-                  : "Richieste"}
-              </Button>
-              <Button
-                className={
-                  sidebarVisible && currentView === "data"
-                    ? "modifiche-button-active"
-                    : ""
-                }
-                icon={<DatabaseOutlined />}
-                onClick={handleDataPanelToggle}
-                style={{
-                  background:
-                    sidebarVisible && currentView === "data"
-                      ? "#FFE8D1"
-                      : "transparent",
-                  borderColor:
-                    sidebarVisible && currentView === "data"
-                      ? "#FFE8D1"
-                      : "#d9d9d9",
-                  color:
-                    sidebarVisible && currentView === "data"
-                      ? "#492513"
-                      : "#d9d9d9",
-                  transition: "all 0.2s ease",
-                }}
-                title={
-                  sidebarVisible && currentView === "data"
-                    ? "Chiudi pannello modifiche"
-                    : "Apri pannello modifiche"
-                }
-              >
-                {sidebarVisible && currentView === "data"
-                  ? "Chiudi Modifiche"
-                  : "Modifiche"}
-              </Button>
-            </div>
-          </Header>
-
-          <Layout style={{ marginTop: 64 }}>
-            <Content
-              style={{ position: "relative", minHeight: "calc(100vh - 64px)" }}
+        <AntdApp>
+          <Layout style={{ minHeight: "100vh" }}>
+            <Header
+              className="app-header"
+              style={{
+                position: "fixed",
+                zIndex: 1,
+                width: "100%",
+                background: "#492513",
+                padding: "0 16px",
+                paddingLeft: navigator.platform.includes("Mac")
+                  ? "80px"
+                  : "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
             >
-              <HomePage
-                targetProductId={targetProductId}
-                onTargetProductProcessed={() => setTargetProductId(null)}
-                triggerSettingsModal={triggerSettingsModal}
-                onSettingsTriggered={handleSettingsTriggered}
-                settingsModalVisible={showSettingsModal}
-                onSettingsOpen={handleSettingsOpen}
-                onSettingsClose={handleSettingsClose}
-              />
-
-              {/* Discrete version indicator at bottom center */}
-              <div
-                style={{
-                  position: "fixed",
-                  bottom: "8px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  fontSize: "10px",
-                  color: "#999",
-                  zIndex: 1,
-                  userSelect: "none",
-                  pointerEvents: "none",
-                }}
-              >
-                {getDisplayVersion()}
+              {/* Transfer Mode Indicator */}
+              <div style={{ display: "flex", alignItems: "center" }}>
+                {transferModeEnabled && (
+                  <Button
+                    size="middle"
+                    style={{
+                      background: "transparent",
+                      borderColor: "#FFE8D1",
+                      color: "#FFE8D1",
+                      cursor: "default",
+                    }}
+                    disabled
+                  >
+                    Modalità Trasferimenti 🚨
+                  </Button>
+                )}
               </div>
-            </Content>
 
-            {/* Sidebar Drawer for mobile/tablet */}
-            <Drawer
-              title={getSidebarTitle()}
-              placement="right"
-              onClose={() => setSidebarVisible(false)}
-              open={sidebarVisible && window.innerWidth < 1200}
-              width={500}
-              styles={{ body: { padding: 0 } }}
-            >
-              {renderSidebarContent()}
-            </Drawer>
+              <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
+                {/* Update Check Button */}
+                <Button
+                  icon={
+                    isChecking ? (
+                      <DownloadOutlined />
+                    ) : lastCheckFoundNoUpdate ? (
+                      <CheckCircleOutlined />
+                    ) : (
+                      <DownloadOutlined />
+                    )
+                  }
+                  onClick={handleManualUpdateCheck}
+                  loading={isChecking}
+                  style={{
+                    background: "transparent",
+                    borderColor: lastCheckFoundNoUpdate ? "#52c41a" : "#d9d9d9",
+                    color: lastCheckFoundNoUpdate ? "#52c41a" : "#d9d9d9",
+                    transition: "all 0.2s ease",
+                  }}
+                  title={
+                    isChecking
+                      ? "Controllo aggiornamenti in corso..."
+                      : lastCheckFoundNoUpdate
+                      ? "App aggiornata - Clicca per ricontrollare"
+                      : "Controlla aggiornamenti"
+                  }
+                >
+                  {isChecking
+                    ? "Controllo..."
+                    : lastCheckFoundNoUpdate
+                    ? ""
+                    : "Aggiornamenti"}
+                </Button>
 
-            {/* Fixed Sidebar for desktop when data/stats are selected */}
-            {sidebarVisible && window.innerWidth >= 1200 && (
-              <div
-                ref={sidebarRef}
+                <Button
+                  className={
+                    sidebarVisible && currentView === "checkRequests"
+                      ? "controlli-button-active"
+                      : ""
+                  }
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleCheckRequestsPanelToggle}
+                  style={{
+                    background:
+                      sidebarVisible && currentView === "checkRequests"
+                        ? "#FFE8D1"
+                        : "transparent",
+                    borderColor:
+                      sidebarVisible && currentView === "checkRequests"
+                        ? "#FFE8D1"
+                        : "#d9d9d9",
+                    color:
+                      sidebarVisible && currentView === "checkRequests"
+                        ? "#492513"
+                        : "#d9d9d9",
+                    transition: "all 0.2s ease",
+                  }}
+                  title={
+                    sidebarVisible && currentView === "checkRequests"
+                      ? "Chiudi pannello richieste"
+                      : "Apri pannello richieste"
+                  }
+                >
+                  {sidebarVisible && currentView === "checkRequests"
+                    ? "Chiudi Richieste"
+                    : "Richieste"}
+                </Button>
+                <Button
+                  className={
+                    sidebarVisible && currentView === "data"
+                      ? "modifiche-button-active"
+                      : ""
+                  }
+                  icon={<DatabaseOutlined />}
+                  onClick={handleDataPanelToggle}
+                  style={{
+                    background:
+                      sidebarVisible && currentView === "data"
+                        ? "#FFE8D1"
+                        : "transparent",
+                    borderColor:
+                      sidebarVisible && currentView === "data"
+                        ? "#FFE8D1"
+                        : "#d9d9d9",
+                    color:
+                      sidebarVisible && currentView === "data"
+                        ? "#492513"
+                        : "#d9d9d9",
+                    transition: "all 0.2s ease",
+                  }}
+                  title={
+                    sidebarVisible && currentView === "data"
+                      ? "Chiudi pannello modifiche"
+                      : "Apri pannello modifiche"
+                  }
+                >
+                  {sidebarVisible && currentView === "data"
+                    ? "Chiudi Modifiche"
+                    : "Modifiche"}
+                </Button>
+              </div>
+            </Header>
+
+            <Layout style={{ marginTop: 64 }}>
+              <Content
                 style={{
-                  position: "fixed",
-                  right: 0,
-                  top: 64,
-                  bottom: 0,
-                  zIndex: 100,
-                  width: 450,
-                  background: "white",
-                  boxShadow: "-2px 0 8px rgba(0,0,0,0.15)",
+                  position: "relative",
+                  minHeight: "calc(100vh - 64px)",
                 }}
               >
+                <HomePage
+                  targetProductId={targetProductId}
+                  onTargetProductProcessed={() => setTargetProductId(null)}
+                  triggerSettingsModal={triggerSettingsModal}
+                  onSettingsTriggered={handleSettingsTriggered}
+                  settingsModalVisible={showSettingsModal}
+                  onSettingsOpen={handleSettingsOpen}
+                  onSettingsClose={handleSettingsClose}
+                  transferModeEnabled={transferModeEnabled}
+                  onTransferModeChange={handleTransferModeChange}
+                />
+
+                {/* Discrete version indicator at bottom center */}
+                <div
+                  style={{
+                    position: "fixed",
+                    bottom: "8px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    fontSize: "10px",
+                    color: "#999",
+                    zIndex: 1,
+                    userSelect: "none",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {getDisplayVersion()}
+                </div>
+              </Content>
+
+              {/* Sidebar Drawer for mobile/tablet */}
+              <Drawer
+                title={getSidebarTitle()}
+                placement="right"
+                onClose={() => setSidebarVisible(false)}
+                open={sidebarVisible && window.innerWidth < 1200}
+                width={500}
+                styles={{ body: { padding: 0 } }}
+              >
+                {renderSidebarContent()}
+              </Drawer>
+
+              {/* Fixed Sidebar for desktop when data/stats are selected */}
+              {sidebarVisible && window.innerWidth >= 1200 && (
+                <div
+                  ref={sidebarRef}
+                  style={{
+                    position: "fixed",
+                    right: 0,
+                    top: 64,
+                    bottom: 0,
+                    zIndex: 100,
+                    width: 450,
+                    background: "white",
+                    boxShadow: "-2px 0 8px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "16px",
+                      borderBottom: "1px solid #f0f0f0",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <h3 style={{ margin: 0 }}>{getSidebarTitle()}</h3>
+                    <Button
+                      type="text"
+                      icon={<CloseOutlined />}
+                      onClick={() => setSidebarVisible(false)}
+                      size="small"
+                    />
+                  </div>
+                  <div
+                    className="sidebar-content"
+                    style={{ height: "calc(100% - 65px)", overflow: "auto" }}
+                  >
+                    {renderSidebarContent()}
+                  </div>
+                </div>
+              )}
+            </Layout>
+
+            {/* Update Modal */}
+            <UpdateModal
+              open={showUpdateModal}
+              update={update}
+              onClose={closeUpdateModal}
+              onUpdateCompleted={handleUpdateCompleted}
+            />
+
+            {/* About Modal */}
+            <Modal
+              title={
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <InfoCircleOutlined />
+                  Informazioni
+                </div>
+              }
+              open={showAboutModal}
+              onCancel={handleAboutClose}
+              footer={[
+                <Button key="close" type="primary" onClick={handleAboutClose}>
+                  Chiudi
+                </Button>,
+              ]}
+              width={600}
+            >
+              <div style={{ padding: "16px 0", textAlign: "center" }}>
+                <div style={{ fontSize: "24px", marginBottom: "16px" }}>🏪</div>
+                <h2 style={{ marginBottom: "8px" }}>
+                  Inventario CappellettoShop
+                </h2>
+                <p style={{ color: "#666", marginBottom: "16px" }}>
+                  Versione {getDisplayVersion()}
+                  {isDevelopmentVersion() && (
+                    <span style={{ color: "#f5a623", marginLeft: "8px" }}>
+                      🚧 Dev
+                    </span>
+                  )}
+                </p>
+
+                {/* Primary Location Indicator */}
                 <div
                   style={{
                     padding: "16px",
-                    borderBottom: "1px solid #f0f0f0",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    backgroundColor: "#e6f7ff",
+                    border: "2px solid #1890ff",
+                    borderRadius: "8px",
+                    marginBottom: "24px",
+                    textAlign: "center",
                   }}
                 >
-                  <h3 style={{ margin: 0 }}>{getSidebarTitle()}</h3>
-                  <Button
-                    type="text"
-                    icon={<CloseOutlined />}
-                    onClick={() => setSidebarVisible(false)}
-                    size="small"
-                  />
+                  <div
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      color: "#1890ff",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    📍 POSIZIONE SELEZIONATA
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "24px",
+                      fontWeight: "bold",
+                      color: "#1890ff",
+                    }}
+                  >
+                    {getPrimaryLocationName().toUpperCase()}
+                  </div>
                 </div>
+
+                {/* Build Information */}
                 <div
-                  className="sidebar-content"
-                  style={{ height: "calc(100% - 65px)", overflow: "auto" }}
+                  style={{
+                    padding: "12px",
+                    backgroundColor: "#f9f9f9",
+                    borderRadius: "6px",
+                    marginBottom: "24px",
+                    fontSize: "12px",
+                    color: "#666",
+                  }}
                 >
-                  {renderSidebarContent()}
+                  <div style={{ marginBottom: "4px" }}>
+                    <strong>Build:</strong> {getBuildInfo()}
+                  </div>
+                  <div>
+                    <strong>Commit:</strong> {getCommitHash()}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: "left", marginBottom: "24px" }}>
+                  <p>
+                    <strong>📦 Gestione Inventario</strong>
+                  </p>
+                  <p style={{ marginLeft: "20px", color: "#666" }}>
+                    Sistema completo per la gestione dell'inventario del
+                    negozio, con sincronizzazione in tempo reale con Shopify.
+                  </p>
+
+                  <p>
+                    <strong>🔄 Funzionalità Principali</strong>
+                  </p>
+                  <div style={{ marginLeft: "20px", color: "#666" }}>
+                    <p>• Ricerca prodotti per SKU e nome</p>
+                    <p>• Aggiornamento quantità inventario</p>
+                    <p>• Gestione richieste di controllo</p>
+                    <p>• Logging completo delle modifiche</p>
+                    <p>• Auto-aggiornamenti</p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "12px",
+                    backgroundColor: "#f6f6f6",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    color: "#666",
+                  }}
+                >
+                  Sviluppato con ❤️ per CappellettoShop
                 </div>
               </div>
-            )}
+            </Modal>
           </Layout>
-
-          {/* Update Modal */}
-          <UpdateModal
-            open={showUpdateModal}
-            update={update}
-            onClose={closeUpdateModal}
-            onUpdateCompleted={handleUpdateCompleted}
-          />
-
-          {/* About Modal */}
-          <Modal
-            title={
-              <div
-                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-              >
-                <InfoCircleOutlined />
-                Informazioni
-              </div>
-            }
-            open={showAboutModal}
-            onCancel={handleAboutClose}
-            footer={[
-              <Button key="close" type="primary" onClick={handleAboutClose}>
-                Chiudi
-              </Button>,
-            ]}
-            width={600}
-          >
-            <div style={{ padding: "16px 0", textAlign: "center" }}>
-              <div style={{ fontSize: "24px", marginBottom: "16px" }}>🏪</div>
-              <h2 style={{ marginBottom: "8px" }}>
-                Inventario CappellettoShop
-              </h2>
-              <p style={{ color: "#666", marginBottom: "16px" }}>
-                Versione {getDisplayVersion()}
-                {isDevelopmentVersion() && (
-                  <span style={{ color: "#f5a623", marginLeft: "8px" }}>
-                    🚧 Dev
-                  </span>
-                )}
-              </p>
-
-              {/* Primary Location Indicator */}
-              <div
-                style={{
-                  padding: "16px",
-                  backgroundColor: "#e6f7ff",
-                  border: "2px solid #1890ff",
-                  borderRadius: "8px",
-                  marginBottom: "24px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: "bold",
-                    color: "#1890ff",
-                    marginBottom: "4px",
-                  }}
-                >
-                  📍 POSIZIONE SELEZIONATA
-                </div>
-                <div
-                  style={{
-                    fontSize: "24px",
-                    fontWeight: "bold",
-                    color: "#1890ff",
-                  }}
-                >
-                  {getPrimaryLocationName().toUpperCase()}
-                </div>
-              </div>
-
-              {/* Build Information */}
-              <div
-                style={{
-                  padding: "12px",
-                  backgroundColor: "#f9f9f9",
-                  borderRadius: "6px",
-                  marginBottom: "24px",
-                  fontSize: "12px",
-                  color: "#666",
-                }}
-              >
-                <div style={{ marginBottom: "4px" }}>
-                  <strong>Build:</strong> {getBuildInfo()}
-                </div>
-                <div>
-                  <strong>Commit:</strong> {getCommitHash()}
-                </div>
-              </div>
-
-              <div style={{ textAlign: "left", marginBottom: "24px" }}>
-                <p>
-                  <strong>📦 Gestione Inventario</strong>
-                </p>
-                <p style={{ marginLeft: "20px", color: "#666" }}>
-                  Sistema completo per la gestione dell'inventario del negozio,
-                  con sincronizzazione in tempo reale con Shopify.
-                </p>
-
-                <p>
-                  <strong>🔄 Funzionalità Principali</strong>
-                </p>
-                <div style={{ marginLeft: "20px", color: "#666" }}>
-                  <p>• Ricerca prodotti per SKU e nome</p>
-                  <p>• Aggiornamento quantità inventario</p>
-                  <p>• Gestione richieste di controllo</p>
-                  <p>• Logging completo delle modifiche</p>
-                  <p>• Auto-aggiornamenti</p>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: "12px",
-                  backgroundColor: "#f6f6f6",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  color: "#666",
-                }}
-              >
-                Sviluppato con ❤️ per CappellettoShop
-              </div>
-            </div>
-          </Modal>
-        </Layout>
+        </AntdApp>
       </ConfigProvider>
     </LogProvider>
   );

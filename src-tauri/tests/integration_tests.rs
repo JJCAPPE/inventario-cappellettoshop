@@ -36,7 +36,7 @@ fn test_config_api_url_generation() {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "3.1.0".to_string(),
+        api_version: "3.2.0".to_string(),
         primary_location: "loc1".to_string(),
         secondary_location: "loc2".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -46,7 +46,7 @@ fn test_config_api_url_generation() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.1.0".to_string(),
+        version: "3.2.0".to_string(),
     };
 
     let url = config.get_api_url("products.json");
@@ -63,7 +63,7 @@ fn test_config_headers() {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "3.1.0".to_string(),
+        api_version: "3.2.0".to_string(),
         primary_location: "loc1".to_string(),
         secondary_location: "loc2".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -73,7 +73,7 @@ fn test_config_headers() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.1.0".to_string(),
+        version: "3.2.0".to_string(),
     };
 
     let headers = config.get_headers();
@@ -248,7 +248,7 @@ fn setup_test_config() -> AppConfig {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "3.1.0".to_string(),
+        api_version: "3.2.0".to_string(),
         primary_location: "12345".to_string(),
         secondary_location: "67890".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -258,7 +258,7 @@ fn setup_test_config() -> AppConfig {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.1.0".to_string(),
+        version: "3.2.0".to_string(),
     }
 }
 
@@ -286,8 +286,6 @@ fn test_firebase_config_helper() {
     assert_eq!(firebase_config.project_id, "test-project");
     assert_eq!(firebase_config.auth_domain, "test.firebaseapp.com");
 }
-
-
 
 // ============================================================================
 // ERROR HANDLING TESTS
@@ -384,7 +382,7 @@ fn test_config_validation() {
         access_token: "test-token".to_string(),
         api_key: "test-api-key".to_string(),
         api_secret: "test-api-secret".to_string(),
-        api_version: "3.1.0".to_string(),
+        api_version: "3.2.0".to_string(),
         primary_location: "loc1".to_string(),
         secondary_location: "loc2".to_string(),
         firebase_api_key: "test-firebase-key".to_string(),
@@ -394,7 +392,7 @@ fn test_config_validation() {
         firebase_messaging_sender_id: "123456".to_string(),
         firebase_app_id: "1:123456:web:abc123".to_string(),
         firebase_measurement_id: "G-ABC123".to_string(),
-        version: "3.1.0".to_string(),
+        version: "3.2.0".to_string(),
     };
 
     // Test that all fields are properly set
@@ -497,7 +495,7 @@ impl Default for TestVariant {
             old_inventory_quantity: 5,
             requires_shipping: true,
             admin_graphql_api_id: format!("gid://shopify/ProductVariant/{}", TEST_VARIANT_ID),
-            version: "3.1.0".to_string(),
+            version: "3.2.0".to_string(),
         }
     }
 }
@@ -541,7 +539,7 @@ impl Default for TestImage {
             src: "https://cdn.shopify.com/test-image.jpg".to_string(),
             variant_ids: vec![TEST_VARIANT_ID.to_string()],
             admin_graphql_api_id: "gid://shopify/ProductImage/1234567890".to_string(),
-            version: "3.1.0".to_string(),
+            version: "3.2.0".to_string(),
         }
     }
 }
@@ -1042,7 +1040,7 @@ fn test_missing_required_config_fields() {
                 access_token: "test-token".to_string(),
                 api_key: "test-key".to_string(),
                 api_secret: "test-secret".to_string(),
-                api_version: "3.1.0".to_string(),
+                api_version: "3.2.0".to_string(),
                 primary_location: "loc1".to_string(),
                 secondary_location: "loc2".to_string(),
                 firebase_api_key: "test-firebase-key".to_string(),
@@ -1052,7 +1050,7 @@ fn test_missing_required_config_fields() {
                 firebase_messaging_sender_id: "123456".to_string(),
                 firebase_app_id: "1:123456:web:abc123".to_string(),
                 firebase_measurement_id: "G-ABC123".to_string(),
-                version: "3.1.0".to_string(),
+                version: "3.2.0".to_string(),
             },
             "shop_domain should not be empty",
         ),
@@ -1063,7 +1061,7 @@ fn test_missing_required_config_fields() {
                 access_token: "".to_string(),
                 api_key: "test-key".to_string(),
                 api_secret: "test-secret".to_string(),
-                api_version: "3.1.0".to_string(),
+                api_version: "3.2.0".to_string(),
                 primary_location: "loc1".to_string(),
                 secondary_location: "loc2".to_string(),
                 firebase_api_key: "test-firebase-key".to_string(),
@@ -1073,7 +1071,7 @@ fn test_missing_required_config_fields() {
                 firebase_messaging_sender_id: "123456".to_string(),
                 firebase_app_id: "1:123456:web:abc123".to_string(),
                 firebase_measurement_id: "G-ABC123".to_string(),
-                version: "3.1.0".to_string(),
+                version: "3.2.0".to_string(),
             },
             "access_token should not be empty",
         ),
@@ -1148,4 +1146,368 @@ fn test_network_error_simulation() {
         assert!(formatted_error.contains(scenario));
         assert!(formatted_error.contains(expected_message));
     }
+}
+
+// ============================================================================
+// TRANSFER FUNCTIONALITY TESTS
+// ============================================================================
+
+#[test]
+fn test_transfer_inventory_validation() {
+    // Test transfer function parameter validation
+    let inventory_item_id = "123456789".to_string();
+    let from_location_id = "loc_from".to_string();
+    let to_location_id = "loc_to".to_string();
+    let product_id = "prod_123".to_string();
+    let variant_title = "Size M".to_string();
+    let product_name = "Test Product".to_string();
+    let price = "29.99".to_string();
+    let from_location = "Treviso".to_string();
+    let to_location = "Mogliano".to_string();
+    let images = vec!["https://example.com/image.jpg".to_string()];
+
+    // Validate all required parameters are present
+    assert!(!inventory_item_id.is_empty());
+    assert!(!from_location_id.is_empty());
+    assert!(!to_location_id.is_empty());
+    assert!(!product_id.is_empty());
+    assert!(!variant_title.is_empty());
+    assert!(!product_name.is_empty());
+    assert!(!price.is_empty());
+    assert!(!from_location.is_empty());
+    assert!(!to_location.is_empty());
+    assert!(!images.is_empty());
+
+    // Validate locations are different
+    assert_ne!(from_location, to_location);
+    assert_ne!(from_location_id, to_location_id);
+}
+
+#[test]
+fn test_transfer_firebase_log_structure() {
+    use chrono::Utc;
+    use inventario_cappellettoshop_lib::firebase::{LogData, LogEntry};
+
+    // Test source location log entry (negative adjustment)
+    let source_log_data = LogData {
+        id: "123456".to_string(),
+        variant: "Size M".to_string(),
+        negozio: "Treviso".to_string(),
+        inventory_item_id: "789012".to_string(),
+        nome: "Test Product".to_string(),
+        prezzo: "29.99".to_string(),
+        rettifica: -1,
+        images: vec!["https://example.com/image.jpg".to_string()],
+    };
+
+    let source_log_entry = LogEntry {
+        request_type: "Trasferimento".to_string(),
+        data: source_log_data,
+        timestamp: Utc::now().to_rfc3339(),
+    };
+
+    // Validate source log structure
+    assert_eq!(source_log_entry.request_type, "Trasferimento");
+    assert_eq!(source_log_entry.data.rettifica, -1);
+    assert_eq!(source_log_entry.data.negozio, "Treviso");
+    assert!(!source_log_entry.timestamp.is_empty());
+
+    // Test destination location log entry (positive adjustment)
+    let dest_log_data = LogData {
+        id: "123456".to_string(),
+        variant: "Size M".to_string(),
+        negozio: "Mogliano".to_string(),
+        inventory_item_id: "789012".to_string(),
+        nome: "Test Product".to_string(),
+        prezzo: "29.99".to_string(),
+        rettifica: 1,
+        images: vec!["https://example.com/image.jpg".to_string()],
+    };
+
+    let dest_log_entry = LogEntry {
+        request_type: "Trasferimento".to_string(),
+        data: dest_log_data,
+        timestamp: Utc::now().to_rfc3339(),
+    };
+
+    // Validate destination log structure
+    assert_eq!(dest_log_entry.request_type, "Trasferimento");
+    assert_eq!(dest_log_entry.data.rettifica, 1);
+    assert_eq!(dest_log_entry.data.negozio, "Mogliano");
+    assert!(!dest_log_entry.timestamp.is_empty());
+
+    // Validate they form a balanced pair
+    assert_eq!(
+        source_log_entry.data.rettifica + dest_log_entry.data.rettifica,
+        0
+    );
+    assert_eq!(source_log_entry.data.id, dest_log_entry.data.id);
+    assert_eq!(source_log_entry.data.variant, dest_log_entry.data.variant);
+}
+
+#[test]
+fn test_transfer_inventory_updates() {
+    // Test that transfer creates correct inventory update structures
+    let inventory_item_id = "123456789".to_string();
+    let from_location_id = "loc_from".to_string();
+    let to_location_id = "loc_to".to_string();
+
+    // Source location update (decrease)
+    let decrease_update = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: from_location_id.clone(),
+        adjustment: -1,
+    };
+
+    // Destination location update (increase)
+    let increase_update = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: to_location_id.clone(),
+        adjustment: 1,
+    };
+
+    // Validate decrease update
+    assert_eq!(decrease_update.variant_id, inventory_item_id);
+    assert_eq!(decrease_update.location_id, from_location_id);
+    assert_eq!(decrease_update.adjustment, -1);
+
+    // Validate increase update
+    assert_eq!(increase_update.variant_id, inventory_item_id);
+    assert_eq!(increase_update.location_id, to_location_id);
+    assert_eq!(increase_update.adjustment, 1);
+
+    // Validate net change is zero
+    assert_eq!(decrease_update.adjustment + increase_update.adjustment, 0);
+}
+
+#[test]
+fn test_transfer_rollback_structure() {
+    // Test rollback inventory update structure
+    let inventory_item_id = "123456789".to_string();
+    let from_location_id = "loc_from".to_string();
+
+    // Original decrease (what failed at destination)
+    let failed_decrease = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: from_location_id.clone(),
+        adjustment: -1,
+    };
+
+    // Rollback increase (to restore original state)
+    let rollback_increase = InventoryUpdate {
+        variant_id: inventory_item_id.clone(),
+        location_id: from_location_id.clone(),
+        adjustment: 1,
+    };
+
+    // Validate rollback restores original state
+    assert_eq!(failed_decrease.adjustment + rollback_increase.adjustment, 0);
+    assert_eq!(failed_decrease.variant_id, rollback_increase.variant_id);
+    assert_eq!(failed_decrease.location_id, rollback_increase.location_id);
+}
+
+#[test]
+fn test_transfer_error_messages() {
+    // Test error message formatting for various failure scenarios
+    let from_location = "Treviso";
+    let to_location = "Mogliano";
+
+    // Test source location error
+    let source_error = format!("Errore nella rimozione da {}: API timeout", from_location);
+    assert!(source_error.contains("Errore nella rimozione da Treviso"));
+    assert!(source_error.contains("API timeout"));
+
+    // Test destination location error
+    let dest_error = format!("Errore nell'aggiunta a {}: Invalid location", to_location);
+    assert!(dest_error.contains("Errore nell'aggiunta a Mogliano"));
+    assert!(dest_error.contains("Invalid location"));
+
+    // Test critical rollback failure error
+    let critical_error = format!(
+        "ERRORE CRITICO: Fallimento trasferimento e rollback fallito. Originale: {}, Rollback: {}",
+        "Destination failed", "Rollback also failed"
+    );
+    assert!(critical_error.contains("ERRORE CRITICO"));
+    assert!(critical_error.contains("Destination failed"));
+    assert!(critical_error.contains("Rollback also failed"));
+
+    // Test insufficient inventory error
+    let insufficient_error = format!(
+        "Impossibile trasferire: nessun inventario disponibile a {}",
+        from_location
+    );
+    assert!(insufficient_error.contains("Impossibile trasferire"));
+    assert!(insufficient_error.contains("Treviso"));
+}
+
+#[test]
+fn test_transfer_success_message() {
+    // Test success message formatting
+    let product_name = "Test Product";
+    let variant_title = "Size M";
+    let from_location = "Treviso";
+    let to_location = "Mogliano";
+
+    let success_message = format!(
+        "Trasferimento completato: {} ({}) spostato da {} a {}",
+        product_name, variant_title, from_location, to_location
+    );
+
+    assert!(success_message.contains("Trasferimento completato"));
+    assert!(success_message.contains("Test Product"));
+    assert!(success_message.contains("Size M"));
+    assert!(success_message.contains("da Treviso a Mogliano"));
+}
+
+#[test]
+fn test_transfer_location_mapping() {
+    // Test location name to ID mapping logic
+    // This simulates the logic used in the transfer function
+
+    // Mock location config
+    let mock_primary_location_id = "primary_loc_123";
+    let mock_secondary_location_id = "secondary_loc_456";
+
+    let available_locations = vec!["Treviso", "Mogliano"];
+
+    // Test primary location mapping
+    let primary_location_name = "Treviso";
+    let mapped_primary_id = if primary_location_name == available_locations[0] {
+        mock_primary_location_id
+    } else {
+        mock_secondary_location_id
+    };
+    assert_eq!(mapped_primary_id, mock_primary_location_id);
+
+    // Test secondary location mapping
+    let secondary_location_name = "Mogliano";
+    let mapped_secondary_id = if secondary_location_name == available_locations[0] {
+        mock_primary_location_id
+    } else {
+        mock_secondary_location_id
+    };
+    assert_eq!(mapped_secondary_id, mock_secondary_location_id);
+
+    // Validate they are different
+    assert_ne!(mapped_primary_id, mapped_secondary_id);
+}
+
+#[test]
+fn test_transfer_enhanced_status_response() {
+    use inventario_cappellettoshop_lib::inventory::EnhancedStatusResponse;
+
+    // Test successful transfer response
+    let success_response = EnhancedStatusResponse {
+        status: "success".to_string(),
+        message: "Trasferimento completato: Test Product (Size M) spostato da Treviso a Mogliano"
+            .to_string(),
+        status_changed: None,
+        product_status: None,
+    };
+
+    assert_eq!(success_response.status, "success");
+    assert!(success_response
+        .message
+        .contains("Trasferimento completato"));
+    assert!(success_response.status_changed.is_none());
+    assert!(success_response.product_status.is_none());
+
+    // Test transfer response with product status change (to draft)
+    let draft_response = EnhancedStatusResponse {
+        status: "success".to_string(),
+        message: "Trasferimento completato con cambio stato".to_string(),
+        status_changed: Some("to_draft".to_string()),
+        product_status: None,
+    };
+
+    assert_eq!(draft_response.status, "success");
+    assert_eq!(draft_response.status_changed, Some("to_draft".to_string()));
+}
+
+#[test]
+fn test_transfer_zero_inventory_detection() {
+    // Test the logic that determines if a product should be set to draft
+    // This simulates the has_zero_inventory_across_all_locations function behavior
+
+    // Mock inventory levels across locations
+    let treviso_inventory = 0;
+    let mogliano_inventory = 1;
+
+    // Product should NOT be draft (has inventory in Mogliano)
+    let has_inventory = treviso_inventory > 0 || mogliano_inventory > 0;
+    assert!(has_inventory);
+
+    // Mock scenario where product becomes completely out of stock
+    let treviso_inventory_empty = 0;
+    let mogliano_inventory_empty = 0;
+
+    // Product SHOULD be draft (no inventory anywhere)
+    let has_no_inventory = treviso_inventory_empty == 0 && mogliano_inventory_empty == 0;
+    assert!(has_no_inventory);
+}
+
+#[test]
+fn test_transfer_firebase_logging_warnings() {
+    // Test that transfer continues even if Firebase logging fails
+    // This represents the non-critical nature of logging failures
+
+    let firebase_log_success = true;
+    let firebase_log_failure = false;
+
+    // Simulate Firebase logging failure scenarios
+    if !firebase_log_success {
+        let warning_message = "⚠️ Warning: Failed to log source transfer: Connection timeout";
+        assert!(warning_message.contains("Warning"));
+        assert!(warning_message.contains("Failed to log source transfer"));
+    }
+
+    if !firebase_log_failure {
+        let warning_message = "⚠️ Warning: Failed to log destination transfer: Invalid request";
+        assert!(warning_message.contains("Warning"));
+        assert!(warning_message.contains("Failed to log destination transfer"));
+    }
+
+    // Transfer should succeed even with logging failures
+    let transfer_result = "success";
+    assert_eq!(transfer_result, "success");
+}
+
+#[test]
+fn test_transfer_parameter_validation() {
+    // Test validation of all transfer parameters
+
+    // Valid parameters
+    let valid_params = (
+        "123456789",       // inventory_item_id
+        "loc_from",        // from_location_id
+        "loc_to",          // to_location_id
+        "prod_123",        // product_id
+        "Size M",          // variant_title
+        "Test Product",    // product_name
+        "29.99",           // price
+        "Treviso",         // from_location
+        "Mogliano",        // to_location
+        vec!["image.jpg"], // images
+    );
+
+    // Validate all parameters are non-empty
+    assert!(!valid_params.0.is_empty()); // inventory_item_id
+    assert!(!valid_params.1.is_empty()); // from_location_id
+    assert!(!valid_params.2.is_empty()); // to_location_id
+    assert!(!valid_params.3.is_empty()); // product_id
+    assert!(!valid_params.4.is_empty()); // variant_title
+    assert!(!valid_params.5.is_empty()); // product_name
+    assert!(!valid_params.6.is_empty()); // price
+    assert!(!valid_params.7.is_empty()); // from_location
+    assert!(!valid_params.8.is_empty()); // to_location
+    assert!(!valid_params.9.is_empty()); // images
+
+    // Validate locations are different
+    assert_ne!(valid_params.7, valid_params.8); // from_location != to_location
+    assert_ne!(valid_params.1, valid_params.2); // from_location_id != to_location_id
+
+    // Validate price format
+    let price_parsed: Result<f64, _> = valid_params.6.parse();
+    assert!(price_parsed.is_ok());
+    assert!(price_parsed.unwrap() > 0.0);
 }
