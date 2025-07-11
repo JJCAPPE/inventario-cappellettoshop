@@ -1290,8 +1290,7 @@ const HomePage: React.FC<HomePageProps> = ({
                                 borderColor: "#fa8c16",
                               }}
                             >
-                              Trasferisci {primaryLocation} →{" "}
-                              {secondaryLocation}
+                              Trasferisci
                             </Button>
                           </Col>
                         </Row>
@@ -1736,134 +1735,152 @@ const HomePage: React.FC<HomePageProps> = ({
         okText="Salva"
         cancelText="Annulla"
         confirmLoading={isSettingsSaving}
-        width={500}
+        width={700}
       >
         <div style={{ padding: "16px 0" }}>
-          <Title level={5}>Posizione Principale</Title>
-          <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
-            Seleziona la tua posizione principale. Questa sarà usata come
-            negozio primario per la gestione dell'inventario.
-          </Text>
-
-          <Radio.Group
-            value={pendingPrimaryLocation}
-            onChange={(e) => handlePendingLocationChange(e.target.value)}
-            style={{ width: "100%" }}
-          >
-            <Space direction="vertical" style={{ width: "100%" }}>
-              {LOCATION_CONFIG.availableLocations.map((location) => (
-                <Radio
-                  key={location}
-                  value={location}
-                  style={{ fontSize: 16, padding: "8px 0" }}
-                >
-                  <Space>
-                    <span>{location}</span>
-                    {pendingPrimaryLocation === location && (
-                      <Tag color="blue">Principale</Tag>
-                    )}
-                    {LOCATION_CONFIG.getSecondaryLocation(
-                      pendingPrimaryLocation
-                    ) === location && <Tag color="default">Secondario</Tag>}
-                  </Space>
-                </Radio>
-              ))}
-            </Space>
-          </Radio.Group>
-
-          <Divider />
-
-          <Title level={5}>Ordinamento Risultati Ricerca</Title>
-          <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
-            Scegli come ordinare i risultati quando cerchi prodotti per nome.
-          </Text>
-
-          <Radio.Group
-            value={pendingSearchSortKey}
-            onChange={(e) => handlePendingSearchSortChange(e.target.value)}
-            style={{ width: "100%" }}
-          >
-            <Space direction="vertical" style={{ width: "100%" }}>
-              <Radio
-                value="RELEVANCE"
-                style={{ fontSize: 16, padding: "8px 0" }}
+          <Row gutter={32}>
+            {/* Left Column - General Settings */}
+            <Col span={12}>
+              <Title level={5}>Posizione Principale</Title>
+              <Text
+                type="secondary"
+                style={{ marginBottom: 16, display: "block" }}
               >
-                <Space>
-                  <span>Rilevanza</span>
-                  <Tag color="default">Predefinito</Tag>
+                Seleziona la tua posizione principale. Questa sarà usata come
+                negozio primario per la gestione dell'inventario.
+              </Text>
+
+              <Radio.Group
+                value={pendingPrimaryLocation}
+                onChange={(e) => handlePendingLocationChange(e.target.value)}
+                style={{ width: "100%", marginBottom: 24 }}
+              >
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {LOCATION_CONFIG.availableLocations.map((location) => (
+                    <Radio
+                      key={location}
+                      value={location}
+                      style={{ fontSize: 16, padding: "8px 0" }}
+                    >
+                      <Space>
+                        <span>{location}</span>
+                        {pendingPrimaryLocation === location && (
+                          <Tag color="blue">Principale</Tag>
+                        )}
+                        {LOCATION_CONFIG.getSecondaryLocation(
+                          pendingPrimaryLocation
+                        ) === location && <Tag color="default">Secondario</Tag>}
+                      </Space>
+                    </Radio>
+                  ))}
                 </Space>
-              </Radio>
-              <Radio
-                value="UPDATED_AT"
-                style={{ fontSize: 16, padding: "8px 0" }}
-              >
-                <span>Aggiornati di recente</span>
-              </Radio>
-              <Radio
-                value="CREATED_AT"
-                style={{ fontSize: 16, padding: "8px 0" }}
-              >
-                <span>Più recenti</span>
-              </Radio>
-              <Radio
-                value="INVENTORY_TOTAL"
-                style={{ fontSize: 16, padding: "8px 0" }}
-              >
-                <span>Inventario totale</span>
-              </Radio>
-            </Space>
-          </Radio.Group>
+              </Radio.Group>
 
-          <div style={{ marginTop: 18 }}>
-            <Space style={{ width: "100%", justifyContent: "space-between" }}>
-              <div>
-                <Text strong>Ordine Invertito</Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {pendingSearchSortReverse
-                    ? "Dal più alto al più basso"
-                    : "Dal più basso al più alto"}
-                </Text>
+              <Title level={5}>Modalità Trasferimenti</Title>
+              <Text
+                type="secondary"
+                style={{ marginBottom: 16, display: "block" }}
+              >
+                Attiva la modalità trasferimenti per spostare inventario tra le
+                posizioni. Quando attiva, apparirà un pulsante "Trasferisci"
+                accanto a "Modifica Variante".
+              </Text>
+
+              <div style={{ marginBottom: 18 }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
+                  <div>
+                    <Text strong>Abilita Trasferimenti</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {pendingTransferModeEnabled
+                        ? "Modalità trasferimenti attiva"
+                        : "Modalità trasferimenti disattiva"}
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={pendingTransferModeEnabled}
+                    onChange={handlePendingTransferModeChange}
+                    checkedChildren="✓"
+                    unCheckedChildren="✗"
+                  />
+                </Space>
               </div>
-              <Switch
-                checked={pendingSearchSortReverse}
-                onChange={handlePendingSearchSortReverseChange}
-                checkedChildren="↓"
-                unCheckedChildren="↑"
-              />
-            </Space>
-          </div>
+            </Col>
 
-          <Divider />
+            {/* Right Column - Search Sorting */}
+            <Col span={12}>
+              <Title level={5}>Ordinamento Risultati Ricerca</Title>
+              <Text
+                type="secondary"
+                style={{ marginBottom: 16, display: "block" }}
+              >
+                Scegli come ordinare i risultati quando cerchi prodotti per
+                nome.
+              </Text>
 
-          <Title level={5}>Modalità Trasferimenti</Title>
-          <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
-            Attiva la modalità trasferimenti per spostare inventario tra le
-            posizioni. Quando attiva, apparirà un pulsante "Trasferisci" accanto
-            a "Modifica Variante".
-          </Text>
+              <Radio.Group
+                value={pendingSearchSortKey}
+                onChange={(e) => handlePendingSearchSortChange(e.target.value)}
+                style={{ width: "100%" }}
+              >
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  <Radio
+                    value="RELEVANCE"
+                    style={{ fontSize: 16, padding: "8px 0" }}
+                  >
+                    <Space>
+                      <span>Rilevanza</span>
+                      <Tag color="default">Predefinito</Tag>
+                    </Space>
+                  </Radio>
+                  <Radio
+                    value="UPDATED_AT"
+                    style={{ fontSize: 16, padding: "8px 0" }}
+                  >
+                    <span>Aggiornati di recente</span>
+                  </Radio>
+                  <Radio
+                    value="CREATED_AT"
+                    style={{ fontSize: 16, padding: "8px 0" }}
+                  >
+                    <span>Più recenti</span>
+                  </Radio>
+                  <Radio
+                    value="INVENTORY_TOTAL"
+                    style={{ fontSize: 16, padding: "8px 0" }}
+                  >
+                    <span>Inventario totale</span>
+                  </Radio>
+                </Space>
+              </Radio.Group>
 
-          <div style={{ marginBottom: 18 }}>
-            <Space style={{ width: "100%", justifyContent: "space-between" }}>
-              <div>
-                <Text strong>Abilita Trasferimenti</Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {pendingTransferModeEnabled
-                    ? "Modalità trasferimenti attiva"
-                    : "Modalità trasferimenti disattiva"}
-                </Text>
+              <div style={{ marginTop: 18 }}>
+                <Space
+                  style={{ width: "100%", justifyContent: "space-between" }}
+                >
+                  <div>
+                    <Text strong>Ordine Invertito</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {pendingSearchSortReverse
+                        ? "Dal più alto al più basso"
+                        : "Dal più basso al più alto"}
+                    </Text>
+                  </div>
+                  <Switch
+                    checked={pendingSearchSortReverse}
+                    onChange={handlePendingSearchSortReverseChange}
+                    checkedChildren="↓"
+                    unCheckedChildren="↑"
+                  />
+                </Space>
               </div>
-              <Switch
-                checked={pendingTransferModeEnabled}
-                onChange={handlePendingTransferModeChange}
-                checkedChildren="✓"
-                unCheckedChildren="✗"
-              />
-            </Space>
-          </div>
+            </Col>
+          </Row>
 
-          <Divider />
+          <Divider style={{ marginTop: 24 }} />
 
           <Text type="secondary" style={{ fontSize: 12 }}>
             💡 Suggerimento: Usa Cmd+, (Mac) o Ctrl+, (Windows) per aprire
