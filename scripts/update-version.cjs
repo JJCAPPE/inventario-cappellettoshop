@@ -121,7 +121,7 @@ const filesToUpdate = [
     },
 
     {
-        path: "SETUP_COMPLETE.md",
+        path: "docs/SETUP_COMPLETE.md",
         replacements: [{
             pattern: /App Version\*\*:\s*\d+\.\d+\.\d+/,
             replacement: `App Version**: ${targetVersion}`,
@@ -129,7 +129,7 @@ const filesToUpdate = [
     },
 
     {
-        path: "src-tauri/TEST_README.md",
+        path: "docs/TEST_README.md",
         replacements: [{
             pattern: /VERSION=\d+\.\d+\.\d+/g,
             replacement: `VERSION=${targetVersion}`,

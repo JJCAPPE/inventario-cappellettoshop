@@ -107,8 +107,8 @@ TAURI_SIGNING_PRIVATE_KEY=your_private_signing_key
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD=your_key_password
 
 # Application Version
-VERSION=3.1.0
-VITE_VERSION=3.1.0
+VERSION=3.2.0
+VITE_VERSION=3.2.0
 ```
 
 4. Run the development server:
