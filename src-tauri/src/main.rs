@@ -15,11 +15,13 @@ use inventario_cappellettoshop_lib::utils::AppConfig;
 
 fn create_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     // Create custom menu items
-    let settings = MenuItemBuilder::with_id("settings", "Settings")
+    let settings = MenuItemBuilder::with_id("settings", "Impostazioni")
         .accelerator("CmdOrCtrl+,")
         .build(app)?;
 
-    let about = MenuItemBuilder::with_id("about", "About Inventario CappellettoShop").build(app)?;
+    let about = MenuItemBuilder::with_id("about", "About Inventario CappellettoShop")
+        .accelerator("CmdOrCtrl+.")
+        .build(app)?;
 
     let quit = MenuItemBuilder::with_id("quit", "Quit")
         .accelerator("CmdOrCtrl+Q")

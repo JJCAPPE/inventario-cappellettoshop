@@ -15,7 +15,6 @@ import {
   CloseOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
-  RocketOutlined,
   InfoCircleOutlined,
 } from "@ant-design/icons";
 import HomePage from "./components/HomePage";
@@ -105,6 +104,10 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [triggerSettingsModal, setTriggerSettingsModal] = useState(false);
 
+  // Transfer mode state - default to false (normal mode)
+  const [transferModeEnabled, setTransferModeEnabled] =
+    useState<boolean>(false);
+
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Initialize updater with configuration
@@ -124,6 +127,16 @@ function App() {
 
   useEffect(() => {
     document.title = `Inventario CappellettoShop ${getDisplayVersion()}`;
+
+    // Load saved transfer mode preference from localStorage (default to false = normal mode)
+    const savedTransferMode = localStorage.getItem("transferModeEnabled");
+    if (savedTransferMode !== null) {
+      setTransferModeEnabled(savedTransferMode === "true");
+    } else {
+      // Explicitly set to false and save to localStorage if no preference exists
+      setTransferModeEnabled(false);
+      localStorage.setItem("transferModeEnabled", "false");
+    }
 
     // Set up menu event listeners
     const setupMenuListeners = async () => {
@@ -196,29 +209,13 @@ function App() {
         content: errorMessage,
         duration: 4,
       });
-
-      notification.error({
-        message: "Errore Controllo Aggiornamenti",
-        description: errorMessage,
-        duration: 6,
-        placement: "topRight",
-      });
     }
   };
 
   // Handle update completion
   const handleUpdateCompleted = () => {
     console.log("✅ Update completed successfully from App component");
-
-    // Show celebration notification
-    notification.success({
-      message: "🎉 Aggiornamento Completato!",
-      description:
-        "L'applicazione è stata aggiornata con successo. Tutte le nuove funzionalità sono ora disponibili!",
-      icon: <RocketOutlined style={{ color: "#52c41a" }} />,
-      duration: 10,
-      placement: "topRight",
-    });
+    // No additional notifications - the modal already shows completion status
   };
 
   // Simplified toggle function
@@ -377,6 +374,13 @@ function App() {
     setTriggerSettingsModal(false);
   };
 
+  // Transfer mode change handler
+  const handleTransferModeChange = (enabled: boolean) => {
+    console.log(`⚙️ App: Changing transfer mode to ${enabled}`);
+    setTransferModeEnabled(enabled);
+    localStorage.setItem("transferModeEnabled", enabled.toString());
+  };
+
   return (
     <LogProvider>
       <ConfigProvider theme={customTheme}>
@@ -398,6 +402,24 @@ function App() {
                 justifyContent: "space-between",
               }}
             >
+              {/* Transfer Mode Indicator */}
+              <div style={{ display: "flex", alignItems: "center" }}>
+                {transferModeEnabled && (
+                  <Button
+                    size="middle"
+                    style={{
+                      background: "transparent",
+                      borderColor: "#FFE8D1",
+                      color: "#FFE8D1",
+                      cursor: "default",
+                    }}
+                    disabled
+                  >
+                    Modalità Trasferimenti 🚨
+                  </Button>
+                )}
+              </div>
+
               <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
                 {/* Update Check Button */}
                 <Button
@@ -517,6 +539,8 @@ function App() {
                   settingsModalVisible={showSettingsModal}
                   onSettingsOpen={handleSettingsOpen}
                   onSettingsClose={handleSettingsClose}
+                  transferModeEnabled={transferModeEnabled}
+                  onTransferModeChange={handleTransferModeChange}
                 />
 
                 {/* Discrete version indicator at bottom center */}

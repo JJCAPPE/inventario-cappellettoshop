@@ -71,6 +71,8 @@ interface HomePageProps {
   settingsModalVisible?: boolean;
   onSettingsOpen?: () => void;
   onSettingsClose?: () => void;
+  transferModeEnabled?: boolean;
+  onTransferModeChange?: (enabled: boolean) => void;
 }
 
 const HomePage: React.FC<HomePageProps> = ({
@@ -81,6 +83,8 @@ const HomePage: React.FC<HomePageProps> = ({
   settingsModalVisible,
   onSettingsOpen,
   onSettingsClose,
+  transferModeEnabled = false, // Default to normal mode
+  onTransferModeChange,
 }) => {
   const { fetchLogs } = useLogs();
   const { modal, message: messageApi } = App.useApp();
@@ -119,9 +123,7 @@ const HomePage: React.FC<HomePageProps> = ({
   );
   const [secondaryPanelExpanded, setSecondaryPanelExpanded] = useState(false);
 
-  // Add transfer mode state
-  const [transferModeEnabled, setTransferModeEnabled] =
-    useState<boolean>(false);
+  // Transfer mode state now comes from App.tsx via props
   const [isTransferLoading, setIsTransferLoading] = useState(false);
   const [lastTransferredVariant, setLastTransferredVariant] = useState<
     string | null
@@ -173,11 +175,7 @@ const HomePage: React.FC<HomePageProps> = ({
       setSearchSortReverse(savedSortReverse === "true");
     }
 
-    // Load saved transfer mode preference from localStorage
-    const savedTransferMode = localStorage.getItem("transferModeEnabled");
-    if (savedTransferMode !== null) {
-      setTransferModeEnabled(savedTransferMode === "true");
-    }
+    // Transfer mode is now handled in App.tsx
 
     // Load search history from localStorage
     const savedHistory = localStorage.getItem("searchHistory");
@@ -341,9 +339,8 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleTransferModeChange = (enabled: boolean) => {
-    console.log(`⚙️ Changing transfer mode to ${enabled}`);
-    setTransferModeEnabled(enabled);
-    localStorage.setItem("transferModeEnabled", enabled.toString());
+    console.log(`⚙️ HomePage: Changing transfer mode to ${enabled}`);
+    onTransferModeChange?.(enabled);
 
     const statusText = enabled ? "attivata" : "disattivata";
     messageApi.success(`Modalità Trasferimenti ${statusText}`);

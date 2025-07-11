@@ -59,9 +59,7 @@ export const useUpdater = (
         setUpdate(availableUpdate);
         setShowUpdateModal(true);
         setLastCheckFoundNoUpdate(false);
-        message.info(
-          `Aggiornamento disponibile: versione ${availableUpdate.version}`
-        );
+        // Remove redundant toast - modal shows the update info
       } else {
         console.log("ℹ️ useUpdater: No updates available");
         setUpdate(null);

@@ -72,12 +72,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
     setDownloadProgress(0);
     setDownloadedBytes(0);
 
-    // Show initial toast
-    message.info({
-      content: `Inizio download della versione ${update.version}`,
-      duration: 3,
-    });
-
     try {
       await UpdaterService.downloadAndInstallUpdate(
         update,
@@ -86,14 +80,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
             case "Started":
               if (progress.data?.contentLength) {
                 setDownloadSize(progress.data.contentLength);
-
-                // Toast for download start
-                message.info({
-                  content: `Download iniziato (${formatBytes(
-                    progress.data.contentLength
-                  )})`,
-                  duration: 2,
-                });
               }
               break;
 
@@ -114,31 +100,11 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
 
             case "Finished":
               setDownloadProgress(100);
-
-              // Toast for download completion
-              message.success({
-                content: "Download completato! Installazione in corso...",
-                duration: 3,
-              });
-
-              // Toast for download completion detail
-              message.success({
-                content:
-                  "File scaricato con successo. Installazione in corso...",
-                duration: 4,
-              });
-
               setIsCompleted(true);
               break;
           }
         }
       );
-
-      // Final success notifications
-      message.success({
-        content: "Aggiornamento installato con successo!",
-        duration: 4,
-      });
 
       // Notify parent component
       if (onUpdateCompleted) {
@@ -148,19 +114,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
       const errorMessage =
         err instanceof Error ? err.message : "Errore sconosciuto";
       setError(errorMessage);
-
-      // Error toast
-      message.error({
-        content: errorMessage,
-        duration: 5,
-      });
-
-      // Error toast
-      message.error({
-        content: `Errore durante l'aggiornamento: ${errorMessage}`,
-        duration: 8,
-      });
-
       console.error("❌ Update failed:", err);
     } finally {
       setIsDownloading(false);
@@ -169,6 +122,15 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
 
   const handleClose = () => {
     if (!isDownloading) {
+      // Show clear restart instruction if update was completed
+      if (isCompleted && !error) {
+        message.info({
+          content: "Chiudi e riapri l'app per completare l'aggiornamento",
+          duration: 6,
+          style: { marginTop: "50px" },
+        });
+      }
+
       onClose();
       // Reset state when closing
       setDownloadProgress(0);
@@ -176,15 +138,6 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
       setDownloadSize(null);
       setIsCompleted(false);
       setError(null);
-
-      // Show reminder if update was completed but not restarted
-      if (isCompleted && !error) {
-        message.warning({
-          content:
-            "Ricorda di riavviare l'applicazione per utilizzare la nuova versione",
-          duration: 8,
-        });
-      }
     }
   };
 
@@ -292,29 +245,29 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
             style={{
               marginBottom: 16,
               padding: 16,
-              backgroundColor: "#f6ffed",
-              border: "1px solid #b7eb8f",
+              backgroundColor: "#fff7e6",
+              border: "1px solid #ffd591",
               borderRadius: 6,
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: "18px", marginBottom: "8px" }}>✅</div>
+            <div style={{ fontSize: "18px", marginBottom: "8px" }}>⚠️</div>
             <Text
               strong
               style={{
                 display: "block",
                 marginBottom: "8px",
                 fontSize: "16px",
+                color: "#d48806",
               }}
             >
-              Aggiornamento Scaricato!
+              Riavvio Richiesto
             </Text>
-            <Text
-              type="secondary"
-              style={{ display: "block", fontSize: "14px" }}
-            >
-              L'aggiornamento alla versione {update.version} verrà installato
-              automaticamente al prossimo riavvio dell'applicazione.
+            <Text style={{ display: "block", fontSize: "14px" }}>
+              L'aggiornamento alla versione {update.version} è stato scaricato.
+              <br />
+              <strong>Chiudi e riapri l'app</strong> per completare
+              l'installazione.
             </Text>
           </div>
         )}
@@ -347,8 +300,12 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
               icon={<CloseOutlined />}
               onClick={handleClose}
               size="large"
+              style={{
+                backgroundColor: "#fa8c16",
+                borderColor: "#fa8c16",
+              }}
             >
-              Chiudi
+              Chiudi per Riavviare
             </Button>
           )}
 
