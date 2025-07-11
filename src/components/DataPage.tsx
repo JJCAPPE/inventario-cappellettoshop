@@ -62,6 +62,8 @@ const DataPage: React.FC<DataPageProps> = ({ onNavigateToProduct }) => {
         return "green";
       case "Annullamento":
         return "red";
+      case "Trasferimento":
+        return "orange";
       default:
         return "blue";
     }
@@ -181,6 +183,8 @@ const DataPage: React.FC<DataPageProps> = ({ onNavigateToProduct }) => {
                     ? "#ffebee" // Light red background for Annullamento
                     : log.requestType === "Rettifica"
                     ? "#e8f5e8" // Light green background for Rettifica
+                    : log.requestType === "Trasferimento"
+                    ? "#fff2e8" // Light orange background for Trasferimento
                     : "#fff", // Default white for other types
                 border: "1px solid #f0f0f0",
                 borderRadius: 8,

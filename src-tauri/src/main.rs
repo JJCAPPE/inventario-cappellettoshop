@@ -128,6 +128,7 @@ fn main() {
             // Enhanced inventory commands with Firebase logging
             inventory::decrease_inventory_with_logging,
             inventory::undo_decrease_inventory_with_logging,
+            inventory::transfer_inventory_between_locations,
             // Modification history commands
             inventory::get_product_modification_history,
             // Firebase commands

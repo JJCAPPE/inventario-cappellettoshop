@@ -98,6 +98,10 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastSelectedQuery, setLastSelectedQuery] = useState<string>("");
   const [modifyModalVisible, setModifyModalVisible] = useState(false);
   const [undoModalVisible, setUndoModalVisible] = useState(false);
+  const [transferSuccessModalVisible, setTransferSuccessModalVisible] =
+    useState(false);
+  const [undoTransferModalVisible, setUndoTransferModalVisible] =
+    useState(false);
   const [modificationHistoryModalVisible, setModificationHistoryModalVisible] =
     useState(false);
   const [checkRequestModalVisible, setCheckRequestModalVisible] =
@@ -119,6 +123,16 @@ const HomePage: React.FC<HomePageProps> = ({
   const [pendingSearchSortReverse, setPendingSearchSortReverse] =
     useState<boolean>(false);
   const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+
+  // Add transfer mode state
+  const [transferModeEnabled, setTransferModeEnabled] =
+    useState<boolean>(false);
+  const [pendingTransferModeEnabled, setPendingTransferModeEnabled] =
+    useState<boolean>(false);
+  const [isTransferLoading, setIsTransferLoading] = useState(false);
+  const [lastTransferredVariant, setLastTransferredVariant] = useState<
+    string | null
+  >(null);
 
   // Legacy variables for backward compatibility
   const negozio = primaryLocation;
@@ -150,6 +164,13 @@ const HomePage: React.FC<HomePageProps> = ({
     if (savedSortReverse !== null) {
       setSearchSortReverse(savedSortReverse === "true");
       setPendingSearchSortReverse(savedSortReverse === "true"); // Initialize pending state
+    }
+
+    // Load saved transfer mode preference from localStorage
+    const savedTransferMode = localStorage.getItem("transferModeEnabled");
+    if (savedTransferMode !== null) {
+      setTransferModeEnabled(savedTransferMode === "true");
+      setPendingTransferModeEnabled(savedTransferMode === "true"); // Initialize pending state
     }
 
     // Add keyboard shortcut listener for Cmd+, (settings)
@@ -221,8 +242,15 @@ const HomePage: React.FC<HomePageProps> = ({
       setPendingPrimaryLocation(primaryLocation);
       setPendingSearchSortKey(searchSortKey);
       setPendingSearchSortReverse(searchSortReverse);
+      setPendingTransferModeEnabled(transferModeEnabled);
     }
-  }, [settingsModalVisible, primaryLocation, searchSortKey, searchSortReverse]);
+  }, [
+    settingsModalVisible,
+    primaryLocation,
+    searchSortKey,
+    searchSortReverse,
+    transferModeEnabled,
+  ]);
 
   // Update pending settings functions (don't apply immediately)
   const handlePendingLocationChange = (newPrimaryLocation: string) => {
@@ -237,6 +265,10 @@ const HomePage: React.FC<HomePageProps> = ({
 
   const handlePendingSearchSortReverseChange = (reverse: boolean) => {
     setPendingSearchSortReverse(reverse);
+  };
+
+  const handlePendingTransferModeChange = (enabled: boolean) => {
+    setPendingTransferModeEnabled(enabled);
   };
 
   // Function to refresh current product data with new location
@@ -292,6 +324,7 @@ const HomePage: React.FC<HomePageProps> = ({
       );
       setSearchSortKey(pendingSearchSortKey);
       setSearchSortReverse(pendingSearchSortReverse);
+      setTransferModeEnabled(pendingTransferModeEnabled);
 
       // Save to localStorage
       localStorage.setItem("primaryLocation", pendingPrimaryLocation);
@@ -299,6 +332,10 @@ const HomePage: React.FC<HomePageProps> = ({
       localStorage.setItem(
         "searchSortReverse",
         pendingSearchSortReverse.toString()
+      );
+      localStorage.setItem(
+        "transferModeEnabled",
+        pendingTransferModeEnabled.toString()
       );
 
       // Show success messages for what changed
@@ -334,6 +371,13 @@ const HomePage: React.FC<HomePageProps> = ({
           : "Crescente";
         message.success(`Ordine risultati: ${orderText}`);
       }
+
+      if (pendingTransferModeEnabled !== transferModeEnabled) {
+        const statusText = pendingTransferModeEnabled
+          ? "attivata"
+          : "disattivata";
+        message.success(`Modalità Trasferimenti ${statusText}`);
+      }
     } catch (error) {
       console.error("❌ Error applying settings:", error);
       message.error("Errore nell'applicazione delle impostazioni");
@@ -348,6 +392,7 @@ const HomePage: React.FC<HomePageProps> = ({
     setPendingPrimaryLocation(primaryLocation);
     setPendingSearchSortKey(searchSortKey);
     setPendingSearchSortReverse(searchSortReverse);
+    setPendingTransferModeEnabled(transferModeEnabled);
     onSettingsClose?.();
   };
 
@@ -738,6 +783,239 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   };
 
+  const handleTransferVariant = () => {
+    if (!selectedVariant || !productDetails) return;
+
+    // Check if the selected variant has stock > 0 in primary location
+    const variant = productDetails.varaintiArticolo.find(
+      (v) => v.title === selectedVariant
+    );
+
+    if (!variant) {
+      message.error("Variante non trovata");
+      return;
+    }
+
+    if (variant.inventory_quantity <= 0) {
+      message.warning(
+        `La taglia ${selectedVariant} non ha inventario a ${primaryLocation}. Non è possibile trasferire.`
+      );
+      return;
+    }
+
+    Modal.confirm({
+      title: "Conferma Trasferimento",
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <div>
+          <p>
+            Sei sicuro di voler trasferire <strong>1 unità</strong> della taglia{" "}
+            <strong>{selectedVariant}</strong> dell'articolo{" "}
+            <strong>{productDetails.nomeArticolo}</strong>?
+          </p>
+          <p>
+            <strong>Da:</strong> {primaryLocation} → <strong>A:</strong>{" "}
+            {secondaryLocation}
+          </p>
+          <p style={{ color: "#fa8c16", fontSize: "12px" }}>
+            ⚠️ Questa operazione rimuoverà 1 unità da {primaryLocation} e la
+            aggiungerà a {secondaryLocation}
+          </p>
+        </div>
+      ),
+      okText: "Trasferisci",
+      cancelText: "Annulla",
+      okButtonProps: {
+        style: { backgroundColor: "#fa8c16", borderColor: "#fa8c16" },
+      },
+      onOk: async () => {
+        setIsTransferLoading(true);
+        try {
+          console.log(
+            "🔄 Starting inventory transfer for variant:",
+            selectedVariant
+          );
+          console.log("📦 From:", primaryLocation, "To:", secondaryLocation);
+
+          // Get the variant details
+          const variant = productDetails.varaintiArticolo.find(
+            (v) => v.title === selectedVariant
+          );
+
+          if (!variant) {
+            throw new Error("Variante non trovata");
+          }
+
+          // Get location configuration to map location names to IDs
+          const locationConfig = await TauriAPI.Inventory.getLocationConfig();
+          console.log("📍 Location config:", locationConfig);
+
+          // Determine the correct location IDs
+          const fromLocationId =
+            primaryLocation === LOCATION_CONFIG.availableLocations[0]
+              ? locationConfig.primary_location.id
+              : locationConfig.secondary_location.id;
+
+          const toLocationId =
+            secondaryLocation === LOCATION_CONFIG.availableLocations[0]
+              ? locationConfig.primary_location.id
+              : locationConfig.secondary_location.id;
+
+          console.log(
+            "📍 Transfer from location ID:",
+            fromLocationId,
+            "to:",
+            toLocationId
+          );
+
+          // Execute the transfer via the backend API
+          const result =
+            await TauriAPI.Inventory.transferInventoryBetweenLocations(
+              variant.inventory_item_id,
+              fromLocationId,
+              toLocationId,
+              productDetails.id,
+              selectedVariant,
+              productDetails.nomeArticolo,
+              productDetails.prezzo,
+              primaryLocation,
+              secondaryLocation,
+              productDetails.immaginiArticolo
+            );
+
+          console.log("✅ Inventory transfer successful:", result);
+
+          // Store the transferred variant for potential undo operation
+          setLastTransferredVariant(selectedVariant);
+
+          // Refresh product data to show updated inventory
+          console.log("🔄 Refreshing product data...");
+          await handleSearchSelect(
+            productDetails.id,
+            lastSelectedQuery || productDetails.nomeArticolo
+          );
+
+          // Show transfer success modal
+          setTransferSuccessModalVisible(true);
+
+          // Show enhanced success message
+          message.success({
+            content: result.message,
+            duration: 4,
+          });
+        } catch (error) {
+          console.error("❌ Error transferring inventory:", error);
+          message.error(
+            `Errore nel trasferimento: ${
+              error instanceof Error ? error.message : "Errore sconosciuto"
+            }`
+          );
+        } finally {
+          setIsTransferLoading(false);
+        }
+      },
+    });
+  };
+
+  const handleUndoTransfer = async () => {
+    console.log("🔄 handleUndoTransfer called", {
+      lastTransferredVariant,
+      productDetails: !!productDetails,
+    });
+
+    if (!lastTransferredVariant || !productDetails) {
+      console.log(
+        "❌ Missing lastTransferredVariant or productDetails, returning early"
+      );
+      return;
+    }
+
+    console.log("⏳ Setting transfer loading to true");
+    setIsTransferLoading(true);
+    try {
+      // Get the variant details
+      const variant = productDetails.varaintiArticolo.find(
+        (v) => v.title === lastTransferredVariant
+      );
+
+      if (!variant) {
+        throw new Error("Variante non trovata");
+      }
+
+      console.log(
+        "🔄 Starting transfer undo for variant:",
+        lastTransferredVariant
+      );
+      console.log("📦 From:", secondaryLocation, "To:", primaryLocation);
+
+      // Get location configuration to map location names to IDs
+      const locationConfig = await TauriAPI.Inventory.getLocationConfig();
+      console.log("📍 Location config:", locationConfig);
+
+      // Determine the correct location IDs (reverse of original transfer)
+      const fromLocationId =
+        secondaryLocation === LOCATION_CONFIG.availableLocations[0]
+          ? locationConfig.primary_location.id
+          : locationConfig.secondary_location.id;
+
+      const toLocationId =
+        primaryLocation === LOCATION_CONFIG.availableLocations[0]
+          ? locationConfig.primary_location.id
+          : locationConfig.secondary_location.id;
+
+      console.log(
+        "📍 Undo transfer from location ID:",
+        fromLocationId,
+        "to:",
+        toLocationId
+      );
+
+      // Execute the reverse transfer
+      const result = await TauriAPI.Inventory.transferInventoryBetweenLocations(
+        variant.inventory_item_id,
+        fromLocationId,
+        toLocationId,
+        productDetails.id,
+        lastTransferredVariant,
+        productDetails.nomeArticolo,
+        productDetails.prezzo,
+        secondaryLocation,
+        primaryLocation,
+        productDetails.immaginiArticolo
+      );
+
+      console.log("✅ Transfer undo successful:", result);
+
+      await fetchLogs();
+
+      // Refresh product data to show updated inventory
+      console.log("🔄 Refreshing product data...");
+      await handleSearchSelect(
+        productDetails.id,
+        lastSelectedQuery || productDetails.nomeArticolo
+      );
+
+      // Show undo transfer success modal
+      setUndoTransferModalVisible(true);
+
+      // Show enhanced success message
+      message.success({
+        content: result.message,
+        duration: 4,
+      });
+    } catch (error) {
+      console.error("❌ Error undoing transfer:", error);
+      message.error(
+        `Errore nell'annullamento del trasferimento: ${
+          error instanceof Error ? error.message : "Errore sconosciuto"
+        }`
+      );
+    } finally {
+      console.log("✅ Setting transfer loading to false");
+      setIsTransferLoading(false);
+    }
+  };
+
   const handleReset = () => {
     setQuery("");
     setProductDetails(null);
@@ -746,11 +1024,15 @@ const HomePage: React.FC<HomePageProps> = ({
     setLastSelectedQuery("");
     setModifyModalVisible(false);
     setUndoModalVisible(false);
+    setTransferSuccessModalVisible(false);
+    setUndoTransferModalVisible(false);
     // Reset loading states
     setIsModifyLoading(false);
     setIsUndoLoading(false);
-    // Clear last modified variant
+    setIsTransferLoading(false);
+    // Clear last modified and transferred variants
     setLastModifiedVariant(null);
+    setLastTransferredVariant(null);
   };
 
   return (
@@ -981,16 +1263,50 @@ const HomePage: React.FC<HomePageProps> = ({
 
                   {selectedVariant && (
                     <div style={{ marginTop: 12 }}>
-                      <Button
-                        type="primary"
-                        danger
-                        size="large"
-                        onClick={handleDecreaseInventory}
-                        loading={isModifyLoading}
-                        block
-                      >
-                        Modifica Variante
-                      </Button>
+                      {transferModeEnabled ? (
+                        <Row gutter={8}>
+                          <Col span={12}>
+                            <Button
+                              type="primary"
+                              danger
+                              size="large"
+                              onClick={handleDecreaseInventory}
+                              loading={isModifyLoading}
+                              block
+                            >
+                              Modifica Variante
+                            </Button>
+                          </Col>
+                          <Col span={12}>
+                            <Button
+                              type="primary"
+                              size="large"
+                              onClick={handleTransferVariant}
+                              loading={isTransferLoading}
+                              disabled={!selectedVariant}
+                              block
+                              style={{
+                                backgroundColor: "#fa8c16",
+                                borderColor: "#fa8c16",
+                              }}
+                            >
+                              Trasferisci {primaryLocation} →{" "}
+                              {secondaryLocation}
+                            </Button>
+                          </Col>
+                        </Row>
+                      ) : (
+                        <Button
+                          type="primary"
+                          danger
+                          size="large"
+                          onClick={handleDecreaseInventory}
+                          loading={isModifyLoading}
+                          block
+                        >
+                          Modifica Variante
+                        </Button>
+                      )}
                     </div>
                   )}
                 </Card>
@@ -1327,6 +1643,63 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       </Modal>
 
+      {/* Transfer Success Modal */}
+      <Modal
+        title="Trasferimento Effettuato"
+        open={transferSuccessModalVisible}
+        footer={null}
+        closable={false}
+      >
+        <div style={{ textAlign: "center" }}>
+          <p>
+            Taglia <Text strong>{lastTransferredVariant}</Text> dell'articolo{" "}
+            <Text strong>{productDetails?.nomeArticolo}</Text> è stata
+            trasferita da <Text strong>{primaryLocation}</Text> a{" "}
+            <Text strong>{secondaryLocation}</Text>
+          </p>
+          <Space>
+            <Button
+              type="primary"
+              icon={<UndoOutlined />}
+              onClick={() => {
+                console.log("🖱️ Annulla Trasferimento button clicked!");
+                handleUndoTransfer();
+              }}
+              loading={isTransferLoading}
+              style={{
+                backgroundColor: "#fa8c16",
+                borderColor: "#fa8c16",
+              }}
+            >
+              Annulla Trasferimento
+            </Button>
+            <Button icon={<CloseOutlined />} onClick={handleReset}>
+              Chiudi
+            </Button>
+          </Space>
+        </div>
+      </Modal>
+
+      {/* Undo Transfer Success Modal */}
+      <Modal
+        title="Trasferimento Annullato"
+        open={undoTransferModalVisible}
+        footer={null}
+        closable={false}
+      >
+        <div style={{ textAlign: "center" }}>
+          <p>
+            Taglia <Text strong>{lastTransferredVariant}</Text> dell'articolo{" "}
+            <Text strong>{productDetails?.nomeArticolo}</Text> è stata
+            ri-trasferita da <Text strong>{secondaryLocation}</Text> a{" "}
+            <Text strong>{primaryLocation}</Text>
+          </p>
+          <Button type="primary" icon={<CloseOutlined />} onClick={handleReset}>
+            Chiudi
+          </Button>
+        </div>
+      </Modal>
+
       {/* Modification History Modal */}
       {productDetails && (
         <ModificationHistoryModal
@@ -1457,6 +1830,35 @@ const HomePage: React.FC<HomePageProps> = ({
                 onChange={handlePendingSearchSortReverseChange}
                 checkedChildren="↓"
                 unCheckedChildren="↑"
+              />
+            </Space>
+          </div>
+
+          <Divider />
+
+          <Title level={5}>Modalità Trasferimenti</Title>
+          <Text type="secondary" style={{ marginBottom: 16, display: "block" }}>
+            Attiva la modalità trasferimenti per spostare inventario tra le
+            posizioni. Quando attiva, apparirà un pulsante "Trasferisci" accanto
+            a "Modifica Variante".
+          </Text>
+
+          <div style={{ marginBottom: 18 }}>
+            <Space style={{ width: "100%", justifyContent: "space-between" }}>
+              <div>
+                <Text strong>Abilita Trasferimenti</Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {pendingTransferModeEnabled
+                    ? "Modalità trasferimenti attiva"
+                    : "Modalità trasferimenti disattiva"}
+                </Text>
+              </div>
+              <Switch
+                checked={pendingTransferModeEnabled}
+                onChange={handlePendingTransferModeChange}
+                checkedChildren="✓"
+                unCheckedChildren="✗"
               />
             </Space>
           </div>
