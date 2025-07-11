@@ -9,7 +9,6 @@ import {
   Tag,
   List,
   Modal,
-  message,
   Divider,
   Badge,
   Typography,
@@ -565,12 +564,6 @@ const HomePage: React.FC<HomePageProps> = ({
         return newSelection;
       }
     });
-  };
-
-  const clearAllSelections = () => {
-    console.log("🧹 Clearing all variant selections");
-    setSelectedVariant(null);
-    setSelectedVariants([]);
   };
 
   // Search history functions

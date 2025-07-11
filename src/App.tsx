@@ -4,7 +4,6 @@ import {
   Button,
   Drawer,
   ConfigProvider,
-  notification,
   message,
   Modal,
   App as AntdApp,

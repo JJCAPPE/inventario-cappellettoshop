@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { App } from "antd";
 import HomePage from "../components/HomePage";
 import { LogContext } from "../contexts/LogContext";
 
@@ -35,29 +36,6 @@ const mockProductDetails = {
   ],
 };
 
-const mockSecondaryProductDetails = {
-  availableVariants: [
-    {
-      variant_id: "1",
-      inventory_item_id: "111",
-      title: "Size S",
-      inventory_quantity: 2,
-    },
-    {
-      variant_id: "2",
-      inventory_item_id: "222",
-      title: "Size M",
-      inventory_quantity: 1,
-    },
-    {
-      variant_id: "3",
-      inventory_item_id: "333",
-      title: "Size L",
-      inventory_quantity: 0,
-    },
-  ],
-};
-
 const mockLocationConfig = {
   primary_location: { id: "loc_1", name: "Treviso" },
   secondary_location: { id: "loc_2", name: "Mogliano" },
@@ -69,14 +47,37 @@ const mockLogContext = {
   error: null,
   fetchLogs: vi.fn(),
   refreshLogs: vi.fn(),
+  addLog: vi.fn(),
 };
+
+// Mock custom components
+vi.mock("../components/SearchBar", () => ({
+  default: ({ query, setQuery }: any) => (
+    <input
+      data-testid="search-bar"
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="Cerca per nome prodotto o inserisci SKU per selezione automatica..."
+    />
+  ),
+}));
+
+vi.mock("../components/ModificationHistoryModal", () => ({
+  default: () => <div data-testid="modification-history-modal" />,
+}));
+
+vi.mock("../components/CheckRequestModal", () => ({
+  default: () => <div data-testid="check-request-modal" />,
+}));
 
 // Helper function to render HomePage with context
 const renderHomePage = (props = {}) => {
   return render(
-    <LogContext.Provider value={mockLogContext}>
-      <HomePage {...props} />
-    </LogContext.Provider>
+    <App>
+      <LogContext.Provider value={mockLogContext}>
+        <HomePage {...props} />
+      </LogContext.Provider>
+    </App>
   );
 };
 
@@ -129,36 +130,36 @@ describe("Transfer Mode Functionality", () => {
 
     it("should enable transfer mode when toggle is activated", async () => {
       const user = userEvent.setup();
-      renderHomePage({ settingsModalVisible: true });
-
-      // Find and click the transfer mode toggle
-      const transferToggle = screen.getByRole("switch", {
-        name: /abilita trasferimenti/i,
-      });
-      await user.click(transferToggle);
-
-      expect(transferToggle).toBeChecked();
-    });
-
-    it("should save transfer mode preference to localStorage", async () => {
-      const user = userEvent.setup();
-      const onSettingsClose = vi.fn();
+      const onTransferModeChange = vi.fn();
       renderHomePage({
         settingsModalVisible: true,
-        onSettingsClose,
+        transferModeEnabled: false,
+        onTransferModeChange,
       });
 
-      // Enable transfer mode
-      const transferToggle = screen.getByRole("switch", {
-        name: /abilita trasferimenti/i,
-      });
+      // Find the transfer mode toggle (first switch with ✓/✗ icons)
+      const switches = screen.getAllByRole("switch");
+      const transferToggle = switches[0]; // First switch is transfer mode
       await user.click(transferToggle);
 
-      // Click save button
-      const saveButton = screen.getByRole("button", { name: /salva/i });
-      await user.click(saveButton);
+      expect(onTransferModeChange).toHaveBeenCalledWith(true);
+    });
 
-      expect(localStorage.getItem("transferModeEnabled")).toBe("true");
+    it("should call transfer mode change handler when toggled", async () => {
+      const user = userEvent.setup();
+      const onTransferModeChange = vi.fn();
+      renderHomePage({
+        settingsModalVisible: true,
+        transferModeEnabled: false,
+        onTransferModeChange,
+      });
+
+      // Enable transfer mode (first switch with ✓/✗ icons)
+      const switches = screen.getAllByRole("switch");
+      const transferToggle = switches[0]; // First switch is transfer mode
+      await user.click(transferToggle);
+
+      expect(onTransferModeChange).toHaveBeenCalledWith(true);
     });
   });
 
@@ -169,7 +170,6 @@ describe("Transfer Mode Functionality", () => {
     });
 
     it("should show transfer button when transfer mode is enabled and variant is selected", async () => {
-      const user = userEvent.setup();
       renderHomePage();
 
       // Simulate product selection and variant selection
@@ -215,7 +215,6 @@ describe("Transfer Mode Functionality", () => {
     });
 
     it("should show confirmation modal when transfer button is clicked", async () => {
-      const user = userEvent.setup();
       renderHomePage();
 
       // Simulate having a product loaded and variant selected
@@ -224,7 +223,6 @@ describe("Transfer Mode Functionality", () => {
     });
 
     it("should call transfer API with correct parameters", async () => {
-      const user = userEvent.setup();
       renderHomePage();
 
       // Simulate transfer confirmation

@@ -19,6 +19,8 @@ interface LogContextType {
 
 const LogContext = createContext<LogContextType | undefined>(undefined);
 
+export { LogContext }; // Export the context for testing
+
 export const LogProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
