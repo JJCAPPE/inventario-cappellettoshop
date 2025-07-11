@@ -10,6 +10,7 @@ interface SearchBarProps {
   onAutoSelect?: (id: string, query: string) => void;
   sortKey?: string;
   sortReverse?: boolean;
+  onNavigateHistory?: (direction: "up" | "down") => string | null;
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({
@@ -19,6 +20,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onAutoSelect,
   sortKey = "RELEVANCE",
   sortReverse = false,
+  onNavigateHistory,
 }) => {
   const [options, setOptions] = useState<
     Array<{ value: string; label: React.ReactNode }>
@@ -225,6 +227,24 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!onNavigateHistory) return;
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const historyQuery = onNavigateHistory("up");
+      if (historyQuery !== null) {
+        setQuery(historyQuery);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const historyQuery = onNavigateHistory("down");
+      if (historyQuery !== null) {
+        setQuery(historyQuery);
+      }
+    }
+  };
+
   return (
     <AutoComplete
       style={{ width: "100%" }}
@@ -242,6 +262,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         suffix={loading ? <Spin size="small" /> : null}
         placeholder="Cerca per nome prodotto o inserisci SKU per selezione automatica..."
         status={searchStatus}
+        onKeyDown={handleKeyDown}
       />
     </AutoComplete>
   );

@@ -89,6 +89,7 @@ const HomePage: React.FC<HomePageProps> = ({
   const [secondaryProductDetails, setSecondaryProductDetails] =
     useState<SecondaryDetails | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<string | null>(null);
+  const [selectedVariants, setSelectedVariants] = useState<string[]>([]); // Multi-variant selection for transfer mode
   const [primaryLocation, setPrimaryLocation] = useState<LocationName>(
     LOCATION_CONFIG.defaultPrimary
   );
@@ -122,6 +123,20 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastTransferredVariant, setLastTransferredVariant] = useState<
     string | null
   >(null);
+  const [lastTransferredVariants, setLastTransferredVariants] = useState<
+    string[]
+  >([]); // For batch transfers
+  const [transferProgress, setTransferProgress] = useState<{
+    current: number;
+    total: number;
+    currentVariant: string;
+    completed: string[];
+    failed: { variant: string; error: string }[];
+  } | null>(null);
+
+  // Search history state
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   // Legacy variables for backward compatibility
   const negozio = primaryLocation;
@@ -158,6 +173,22 @@ const HomePage: React.FC<HomePageProps> = ({
       setTransferModeEnabled(savedTransferMode === "true");
     }
 
+    // Load search history from localStorage
+    const savedHistory = localStorage.getItem("searchHistory");
+    if (savedHistory) {
+      try {
+        const historyArray = JSON.parse(savedHistory);
+        if (Array.isArray(historyArray)) {
+          setSearchHistory(historyArray);
+        }
+      } catch (error) {
+        console.warn(
+          "Failed to parse search history from localStorage:",
+          error
+        );
+      }
+    }
+
     // Add keyboard shortcut listener for Cmd+, (settings)
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === ",") {
@@ -172,21 +203,46 @@ const HomePage: React.FC<HomePageProps> = ({
     };
   }, []);
 
-  // Clear selected variant if it has zero or negative inventory
+  // Clear selected variants if they have zero or negative inventory
   useEffect(() => {
-    if (selectedVariant && productDetails) {
-      const variantObj = productDetails.varaintiArticolo.find(
-        (v) => v.title === selectedVariant
-      );
-
-      if (!variantObj || variantObj.inventory_quantity <= 0) {
-        console.log(
-          `🚫 Clearing selected variant '${selectedVariant}' because it has zero or negative inventory`
+    if (productDetails) {
+      // Clear single variant if it has zero or negative inventory
+      if (selectedVariant) {
+        const variantObj = productDetails.varaintiArticolo.find(
+          (v) => v.title === selectedVariant
         );
-        setSelectedVariant(null);
+
+        if (!variantObj || variantObj.inventory_quantity <= 0) {
+          console.log(
+            `🚫 Clearing selected variant '${selectedVariant}' because it has zero or negative inventory`
+          );
+          setSelectedVariant(null);
+        }
+      }
+
+      // Clear multi-variants that have zero or negative inventory
+      if (selectedVariants.length > 0) {
+        const validVariants = selectedVariants.filter((variant) => {
+          const variantObj = productDetails.varaintiArticolo.find(
+            (v) => v.title === variant
+          );
+          return variantObj && variantObj.inventory_quantity > 0;
+        });
+
+        if (validVariants.length !== selectedVariants.length) {
+          const removedVariants = selectedVariants.filter(
+            (v) => !validVariants.includes(v)
+          );
+          console.log(
+            `🚫 Clearing selected variants with zero inventory: ${removedVariants.join(
+              ", "
+            )}`
+          );
+          setSelectedVariants(validVariants);
+        }
       }
     }
-  }, [productDetails, selectedVariant]);
+  }, [productDetails, selectedVariant, selectedVariants]);
 
   // Handle external navigation to a specific product
   useEffect(() => {
@@ -242,6 +298,7 @@ const HomePage: React.FC<HomePageProps> = ({
         console.log("🔄 Refreshing product data for new location...");
         await refreshProductWithNewLocation(newPrimaryLocation);
       }
+      handleReset();
     }
   };
 
@@ -422,6 +479,13 @@ const HomePage: React.FC<HomePageProps> = ({
       setSecondaryProductDetails(secondaryDetails);
       console.log("✅ HomePage: Product data set successfully");
 
+      // Add successful search to history
+      addToSearchHistory(searchQuery);
+      // Also add the product title to history for easy access
+      if (productDetails.nomeArticolo !== searchQuery.trim()) {
+        addToSearchHistory(productDetails.nomeArticolo);
+      }
+
       // Handle SKU auto-selection using pre-computed skuMatchingVariant
       if (skuMatchingVariant) {
         // Find the corresponding frontend variant by inventory_item_id
@@ -464,6 +528,179 @@ const HomePage: React.FC<HomePageProps> = ({
     }
 
     setSelectedVariant(variant);
+  };
+
+  const handleMultiVariantToggle = (variant: string) => {
+    console.log("🖱️ Multi-variant toggled:", variant);
+
+    // Check if the variant has negative or zero inventory and prevent selection
+    const variantObj = productDetails?.varaintiArticolo.find(
+      (v) => v.title === variant
+    );
+
+    if (variantObj && variantObj.inventory_quantity <= 0) {
+      message.warning(
+        `La taglia ${variant} non ha inventario disponibile. Non è possibile selezionarla per il trasferimento.`
+      );
+      return;
+    }
+
+    setSelectedVariants((prev) => {
+      if (prev.includes(variant)) {
+        // Remove variant
+        const newSelection = prev.filter((v) => v !== variant);
+        console.log("🗑️ Removed variant, new selection:", newSelection);
+        return newSelection;
+      } else {
+        // Add variant
+        const newSelection = [...prev, variant];
+        console.log("➕ Added variant, new selection:", newSelection);
+        return newSelection;
+      }
+    });
+  };
+
+  const clearAllSelections = () => {
+    console.log("🧹 Clearing all variant selections");
+    setSelectedVariant(null);
+    setSelectedVariants([]);
+  };
+
+  // Search history functions
+  const addToSearchHistory = (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+
+    setSearchHistory((prev) => {
+      // Remove duplicates and add to beginning
+      const filtered = prev.filter((item) => item !== searchQuery.trim());
+      const newHistory = [searchQuery.trim(), ...filtered].slice(0, 25); // Keep only last 25
+
+      // Save to localStorage
+      localStorage.setItem("searchHistory", JSON.stringify(newHistory));
+
+      return newHistory;
+    });
+
+    // Reset history index when new search is added
+    setHistoryIndex(-1);
+  };
+
+  const navigateHistory = (direction: "up" | "down"): string | null => {
+    if (searchHistory.length === 0) return null;
+
+    let newIndex;
+    if (direction === "up") {
+      newIndex =
+        historyIndex < searchHistory.length - 1
+          ? historyIndex + 1
+          : historyIndex;
+    } else {
+      newIndex = historyIndex > -1 ? historyIndex - 1 : -1;
+    }
+
+    setHistoryIndex(newIndex);
+
+    if (newIndex === -1) {
+      return ""; // Return empty string when going back to current input
+    }
+
+    return searchHistory[newIndex] || null;
+  };
+
+  // Batch transfer function for multiple variants
+  const executeBatchTransfer = async (variantNames: string[]) => {
+    if (!productDetails) {
+      throw new Error("Dettagli prodotto non disponibili");
+    }
+
+    const completed: string[] = [];
+    const failed: { variant: string; error: string }[] = [];
+
+    // Get location configuration once
+    const locationConfig = await TauriAPI.Inventory.getLocationConfig();
+
+    const fromLocationId =
+      primaryLocation === LOCATION_CONFIG.availableLocations[0]
+        ? locationConfig.primary_location.id
+        : locationConfig.secondary_location.id;
+
+    const toLocationId =
+      secondaryLocation === LOCATION_CONFIG.availableLocations[0]
+        ? locationConfig.primary_location.id
+        : locationConfig.secondary_location.id;
+
+    // Process each variant sequentially
+    for (let i = 0; i < variantNames.length; i++) {
+      const variantName = variantNames[i];
+
+      // Update progress
+      setTransferProgress({
+        current: i + 1,
+        total: variantNames.length,
+        currentVariant: variantName,
+        completed: [...completed],
+        failed: [...failed],
+      });
+
+      try {
+        console.log(
+          `🔄 [${i + 1}/${
+            variantNames.length
+          }] Transferring variant: ${variantName}`
+        );
+
+        // Find variant details
+        const variant = productDetails.varaintiArticolo.find(
+          (v) => v.title === variantName
+        );
+
+        if (!variant) {
+          throw new Error(`Variante ${variantName} non trovata`);
+        }
+
+        if (variant.inventory_quantity <= 0) {
+          throw new Error(`Nessun inventario disponibile per ${variantName}`);
+        }
+
+        // Execute the transfer
+        const result =
+          await TauriAPI.Inventory.transferInventoryBetweenLocations(
+            variant.inventory_item_id,
+            fromLocationId,
+            toLocationId,
+            productDetails.id,
+            variantName,
+            productDetails.nomeArticolo,
+            productDetails.prezzo,
+            primaryLocation,
+            secondaryLocation,
+            productDetails.immaginiArticolo
+          );
+
+        console.log(
+          `✅ [${i + 1}/${
+            variantNames.length
+          }] Transfer successful for ${variantName}:`,
+          result
+        );
+        completed.push(variantName);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Errore sconosciuto";
+        console.error(
+          `❌ [${i + 1}/${
+            variantNames.length
+          }] Transfer failed for ${variantName}:`,
+          errorMessage
+        );
+        failed.push({ variant: variantName, error: errorMessage });
+      }
+    }
+
+    // Clear progress state
+    setTransferProgress(null);
+
+    return { completed, failed };
   };
 
   const handleDecreaseInventory = () => {
@@ -709,46 +946,113 @@ const HomePage: React.FC<HomePageProps> = ({
   };
 
   const handleTransferVariant = () => {
-    if (!selectedVariant || !productDetails) return;
+    // Support both single and multi-variant modes
+    const variantsToTransfer = transferModeEnabled
+      ? selectedVariants
+      : selectedVariant
+      ? [selectedVariant]
+      : [];
 
-    // Check if the selected variant has stock > 0 in primary location
-    const variant = productDetails.varaintiArticolo.find(
-      (v) => v.title === selectedVariant
-    );
-
-    if (!variant) {
-      message.error("Variante non trovata");
+    if (variantsToTransfer.length === 0 || !productDetails) {
+      console.log("❌ No variants selected or no product details");
       return;
     }
 
-    if (variant.inventory_quantity <= 0) {
-      message.warning(
-        `La taglia ${selectedVariant} non ha inventario a ${primaryLocation}. Non è possibile trasferire.`
+    // Support both single and multiple variant transfers
+    const isMultiple = variantsToTransfer.length > 1;
+
+    if (!productDetails) return;
+
+    // Validate all selected variants have inventory
+    const variantDetails = variantsToTransfer
+      .map((variantName) => {
+        const variant = productDetails.varaintiArticolo.find(
+          (v) => v.title === variantName
+        );
+
+        if (!variant) {
+          message.error(`Variante ${variantName} non trovata`);
+          return null;
+        }
+
+        if (variant.inventory_quantity <= 0) {
+          message.warning(
+            `La taglia ${variantName} non ha inventario a ${primaryLocation}. Non è possibile trasferire.`
+          );
+          return null;
+        }
+
+        return { title: variantName, inventory: variant.inventory_quantity };
+      })
+      .filter(Boolean);
+
+    if (variantDetails.length === 0) {
+      return;
+    }
+
+    if (variantDetails.length !== variantsToTransfer.length) {
+      message.error(
+        "Alcune varianti selezionate non sono disponibili per il trasferimento"
       );
       return;
     }
 
     Modal.confirm({
-      title: "Conferma Trasferimento",
+      title: isMultiple
+        ? "Conferma Trasferimento Multiplo"
+        : "Conferma Trasferimento",
       icon: <ExclamationCircleOutlined />,
+      width: isMultiple ? 600 : 520,
       content: (
         <div>
           <p>
-            Sei sicuro di voler trasferire <strong>1 unità</strong> della taglia{" "}
-            <strong>{selectedVariant}</strong> dell'articolo{" "}
-            <strong>{productDetails.nomeArticolo}</strong>?
+            Sei sicuro di voler trasferire{" "}
+            {isMultiple ? "le seguenti varianti" : "1 unità della taglia"}{" "}
+            {!isMultiple && <strong>{variantDetails[0]?.title}</strong>}{" "}
+            dell'articolo <strong>{productDetails.nomeArticolo}</strong>?
           </p>
-          <p>
+
+          {isMultiple && (
+            <div
+              style={{
+                marginTop: 16,
+                padding: 12,
+                backgroundColor: "#fff7e6",
+                borderRadius: 6,
+              }}
+            >
+              <div style={{ fontWeight: "bold", marginBottom: 8 }}>
+                Varianti da trasferire:
+              </div>
+              <ul style={{ marginTop: 8, marginBottom: 8, paddingLeft: 20 }}>
+                {variantDetails.map((variant: any) => (
+                  <li key={variant.title}>
+                    <span>
+                      {variant.title} (Inventario: {variant.inventory})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div>
+                <strong>Totale:</strong> {variantDetails.length} unità
+              </div>
+            </div>
+          )}
+
+          <p style={{ marginTop: 12 }}>
             <strong>Da:</strong> {primaryLocation} → <strong>A:</strong>{" "}
             {secondaryLocation}
           </p>
-          <p style={{ color: "#fa8c16", fontSize: "12px" }}>
-            ⚠️ Questa operazione rimuoverà 1 unità da {primaryLocation} e la
-            aggiungerà a {secondaryLocation}
+
+          <p style={{ color: "#fa8c16", fontSize: "12px", marginTop: 12 }}>
+            ⚠️ Questa operazione{" "}
+            {isMultiple ? "rimuoverà le unità" : "rimuoverà 1 unità"} da{" "}
+            {primaryLocation} e {isMultiple ? "le" : "la"} aggiungerà a{" "}
+            {secondaryLocation}
           </p>
         </div>
       ),
-      okText: "Trasferisci",
+      okText: isMultiple ? "Trasferisci Tutto" : "Trasferisci",
       cancelText: "Annulla",
       okButtonProps: {
         style: { backgroundColor: "#fa8c16", borderColor: "#fa8c16" },
@@ -757,50 +1061,71 @@ const HomePage: React.FC<HomePageProps> = ({
         setIsTransferLoading(true);
         try {
           console.log(
-            "🔄 Starting inventory transfer for variant:",
-            selectedVariant
+            `🔄 Starting ${
+              isMultiple ? "batch" : "single"
+            } inventory transfer for:`,
+            variantsToTransfer
           );
           console.log("📦 From:", primaryLocation, "To:", secondaryLocation);
 
-          // Get the variant details
-          const variant = productDetails.varaintiArticolo.find(
-            (v) => v.title === selectedVariant
-          );
+          let result;
+          if (isMultiple) {
+            // Execute batch transfer
+            const batchResult = await executeBatchTransfer(variantsToTransfer);
 
-          if (!variant) {
-            throw new Error("Variante non trovata");
-          }
+            if (batchResult.failed.length > 0) {
+              // Some transfers failed
+              const failedVariants = batchResult.failed
+                .map((f) => f.variant)
+                .join(", ");
+              throw new Error(`Trasferimenti falliti per: ${failedVariants}`);
+            }
 
-          // Get location configuration to map location names to IDs
-          const locationConfig = await TauriAPI.Inventory.getLocationConfig();
-          console.log("📍 Location config:", locationConfig);
+            // All transfers succeeded
+            setLastTransferredVariants(batchResult.completed);
+            result = {
+              message: `Trasferiti ${batchResult.completed.length} varianti da ${primaryLocation} a ${secondaryLocation}`,
+            };
+          } else {
+            // Execute single transfer (existing logic)
+            const variantName = variantsToTransfer[0];
+            const variant = productDetails.varaintiArticolo.find(
+              (v) => v.title === variantName
+            );
 
-          // Determine the correct location IDs
-          const fromLocationId =
-            primaryLocation === LOCATION_CONFIG.availableLocations[0]
-              ? locationConfig.primary_location.id
-              : locationConfig.secondary_location.id;
+            if (!variant) {
+              throw new Error("Variante non trovata");
+            }
 
-          const toLocationId =
-            secondaryLocation === LOCATION_CONFIG.availableLocations[0]
-              ? locationConfig.primary_location.id
-              : locationConfig.secondary_location.id;
+            // Get location configuration to map location names to IDs
+            const locationConfig = await TauriAPI.Inventory.getLocationConfig();
+            console.log("📍 Location config:", locationConfig);
 
-          console.log(
-            "📍 Transfer from location ID:",
-            fromLocationId,
-            "to:",
-            toLocationId
-          );
+            // Determine the correct location IDs
+            const fromLocationId =
+              primaryLocation === LOCATION_CONFIG.availableLocations[0]
+                ? locationConfig.primary_location.id
+                : locationConfig.secondary_location.id;
 
-          // Execute the transfer via the backend API
-          const result =
-            await TauriAPI.Inventory.transferInventoryBetweenLocations(
+            const toLocationId =
+              secondaryLocation === LOCATION_CONFIG.availableLocations[0]
+                ? locationConfig.primary_location.id
+                : locationConfig.secondary_location.id;
+
+            console.log(
+              "📍 Transfer from location ID:",
+              fromLocationId,
+              "to:",
+              toLocationId
+            );
+
+            // Execute the transfer via the backend API
+            result = await TauriAPI.Inventory.transferInventoryBetweenLocations(
               variant.inventory_item_id,
               fromLocationId,
               toLocationId,
               productDetails.id,
-              selectedVariant,
+              variantName,
               productDetails.nomeArticolo,
               productDetails.prezzo,
               primaryLocation,
@@ -808,10 +1133,11 @@ const HomePage: React.FC<HomePageProps> = ({
               productDetails.immaginiArticolo
             );
 
-          console.log("✅ Inventory transfer successful:", result);
+            // Store the transferred variant for potential undo operation
+            setLastTransferredVariant(variantName);
+          }
 
-          // Store the transferred variant for potential undo operation
-          setLastTransferredVariant(selectedVariant);
+          console.log("✅ Inventory transfer successful:", result);
 
           // Refresh product data to show updated inventory
           console.log("🔄 Refreshing product data...");
@@ -845,32 +1171,45 @@ const HomePage: React.FC<HomePageProps> = ({
   const handleUndoTransfer = async () => {
     console.log("🔄 handleUndoTransfer called", {
       lastTransferredVariant,
+      lastTransferredVariants: lastTransferredVariants.length,
       productDetails: !!productDetails,
     });
 
-    if (!lastTransferredVariant || !productDetails) {
+    // Determine if we're undoing a batch or single transfer
+    const variantsToUndo =
+      lastTransferredVariants.length > 0
+        ? lastTransferredVariants
+        : lastTransferredVariant
+        ? [lastTransferredVariant]
+        : [];
+
+    // Type guard to ensure we have valid variant names
+    const validVariantsToUndo = variantsToUndo.filter(
+      (v): v is string => v !== null
+    );
+
+    if (validVariantsToUndo.length === 0 || !productDetails) {
       console.log(
-        "❌ Missing lastTransferredVariant or productDetails, returning early"
+        "❌ No transferred variants to undo or productDetails missing, returning early"
       );
       return;
     }
+
+    const variantToUndo = validVariantsToUndo[0]; // Use first validated variant
 
     console.log("⏳ Setting transfer loading to true");
     setIsTransferLoading(true);
     try {
       // Get the variant details
       const variant = productDetails.varaintiArticolo.find(
-        (v) => v.title === lastTransferredVariant
+        (v) => v.title === variantToUndo
       );
 
       if (!variant) {
         throw new Error("Variante non trovata");
       }
 
-      console.log(
-        "🔄 Starting transfer undo for variant:",
-        lastTransferredVariant
-      );
+      console.log("🔄 Starting transfer undo for variant:", variantToUndo);
       console.log("📦 From:", secondaryLocation, "To:", primaryLocation);
 
       // Get location configuration to map location names to IDs
@@ -901,7 +1240,7 @@ const HomePage: React.FC<HomePageProps> = ({
         fromLocationId,
         toLocationId,
         productDetails.id,
-        lastTransferredVariant,
+        variantToUndo,
         productDetails.nomeArticolo,
         productDetails.prezzo,
         secondaryLocation,
@@ -946,6 +1285,7 @@ const HomePage: React.FC<HomePageProps> = ({
     setProductDetails(null);
     setSecondaryProductDetails(null);
     setSelectedVariant(null);
+    setSelectedVariants([]); // Clear multi-variant selection
     setLastSelectedQuery("");
     setModifyModalVisible(false);
     setUndoModalVisible(false);
@@ -958,6 +1298,10 @@ const HomePage: React.FC<HomePageProps> = ({
     // Clear last modified and transferred variants
     setLastModifiedVariant(null);
     setLastTransferredVariant(null);
+    setLastTransferredVariants([]);
+    setTransferProgress(null);
+    // Reset search history navigation
+    setHistoryIndex(-1);
   };
 
   return (
@@ -975,6 +1319,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   onAutoSelect={handleSearchSelect}
                   sortKey={searchSortKey}
                   sortReverse={searchSortReverse}
+                  onNavigateHistory={navigateHistory}
                 />
               </div>
 
@@ -1107,7 +1452,9 @@ const HomePage: React.FC<HomePageProps> = ({
                     dataSource={productDetails.varaintiArticolo}
                     renderItem={(variant) => {
                       const isOutOfStock = variant.inventory_quantity <= 0;
-                      const isSelected = selectedVariant === variant.title;
+                      const isSelected = transferModeEnabled
+                        ? selectedVariants.includes(variant.title)
+                        : selectedVariant === variant.title;
 
                       return (
                         <List.Item
@@ -1131,7 +1478,11 @@ const HomePage: React.FC<HomePageProps> = ({
                             display: "flex",
                             alignItems: "center",
                           }}
-                          onClick={() => handleVariantSelect(variant.title)}
+                          onClick={() =>
+                            transferModeEnabled
+                              ? handleMultiVariantToggle(variant.title)
+                              : handleVariantSelect(variant.title)
+                          }
                         >
                           <div
                             style={{
@@ -1145,6 +1496,19 @@ const HomePage: React.FC<HomePageProps> = ({
                             <div
                               style={{ display: "flex", alignItems: "center" }}
                             >
+                              {transferModeEnabled && (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedVariants.includes(
+                                    variant.title
+                                  )}
+                                  readOnly
+                                  style={{
+                                    marginRight: "8px",
+                                    pointerEvents: "none",
+                                  }}
+                                />
+                              )}
                               <Text
                                 style={{
                                   color: isOutOfStock ? "#999" : "inherit",
@@ -1186,39 +1550,27 @@ const HomePage: React.FC<HomePageProps> = ({
                     }}
                   />
 
-                  {selectedVariant && (
+                  {((transferModeEnabled && selectedVariants.length > 0) ||
+                    (!transferModeEnabled && selectedVariant)) && (
                     <div style={{ marginTop: 12 }}>
                       {transferModeEnabled ? (
-                        <Row gutter={8}>
-                          <Col span={12}>
-                            <Button
-                              type="primary"
-                              danger
-                              size="large"
-                              onClick={handleDecreaseInventory}
-                              loading={isModifyLoading}
-                              block
-                            >
-                              Modifica Variante
-                            </Button>
-                          </Col>
-                          <Col span={12}>
-                            <Button
-                              type="primary"
-                              size="large"
-                              onClick={handleTransferVariant}
-                              loading={isTransferLoading}
-                              disabled={!selectedVariant}
-                              block
-                              style={{
-                                backgroundColor: "#fa8c16",
-                                borderColor: "#fa8c16",
-                              }}
-                            >
-                              Trasferisci
-                            </Button>
-                          </Col>
-                        </Row>
+                        <Button
+                          type="primary"
+                          size="large"
+                          onClick={handleTransferVariant}
+                          loading={isTransferLoading}
+                          disabled={selectedVariants.length === 0}
+                          block
+                          style={{
+                            backgroundColor: "#fa8c16",
+                            borderColor: "#fa8c16",
+                          }}
+                        >
+                          Trasferisci{" "}
+                          {selectedVariants.length > 1
+                            ? `${selectedVariants.length} Varianti`
+                            : "Variante"}
+                        </Button>
                       ) : (
                         <Button
                           type="primary"
@@ -1569,19 +1921,54 @@ const HomePage: React.FC<HomePageProps> = ({
 
       {/* Transfer Success Modal */}
       <Modal
-        title="Trasferimento Effettuato"
+        title={
+          lastTransferredVariants.length > 0
+            ? "Trasferimenti Effettuati"
+            : "Trasferimento Effettuato"
+        }
         open={transferSuccessModalVisible}
         footer={null}
         closable={false}
       >
         <div style={{ textAlign: "center" }}>
-          <p>
-            Taglia <Text strong>{lastTransferredVariant}</Text> dell'articolo{" "}
-            <Text strong>{productDetails?.nomeArticolo}</Text> è stata
-            trasferita da <Text strong>{primaryLocation}</Text> a{" "}
-            <Text strong>{secondaryLocation}</Text>
-          </p>
-          <Space>
+          {lastTransferredVariants.length > 0 ? (
+            // Batch transfer success
+            <div>
+              <p>
+                <Text strong>{lastTransferredVariants.length} varianti</Text>{" "}
+                dell'articolo <Text strong>{productDetails?.nomeArticolo}</Text>{" "}
+                sono state trasferite da <Text strong>{primaryLocation}</Text> a{" "}
+                <Text strong>{secondaryLocation}</Text>
+              </p>
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  backgroundColor: "#f6ffed",
+                  borderRadius: 6,
+                }}
+              >
+                <Text strong>Varianti trasferite:</Text>
+                <div style={{ marginTop: 8 }}>
+                  {lastTransferredVariants.map((variant) => (
+                    <Tag key={variant} color="green" style={{ margin: "2px" }}>
+                      {variant}
+                    </Tag>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Single transfer success
+            <p>
+              Taglia <Text strong>{lastTransferredVariant}</Text> dell'articolo{" "}
+              <Text strong>{productDetails?.nomeArticolo}</Text> è stata
+              trasferita da <Text strong>{primaryLocation}</Text> a{" "}
+              <Text strong>{secondaryLocation}</Text>
+            </p>
+          )}
+
+          <Space style={{ marginTop: 16 }}>
             <Button
               type="primary"
               icon={<UndoOutlined />}
@@ -1595,7 +1982,10 @@ const HomePage: React.FC<HomePageProps> = ({
                 borderColor: "#fa8c16",
               }}
             >
-              Annulla Trasferimento
+              Annulla{" "}
+              {lastTransferredVariants.length > 0
+                ? "Trasferimenti"
+                : "Trasferimento"}
             </Button>
             <Button icon={<CloseOutlined />} onClick={handleReset}>
               Chiudi
@@ -1622,6 +2012,92 @@ const HomePage: React.FC<HomePageProps> = ({
             Chiudi
           </Button>
         </div>
+      </Modal>
+
+      {/* Transfer Progress Modal */}
+      <Modal
+        title="Trasferimento in Corso"
+        open={transferProgress !== null}
+        footer={null}
+        closable={false}
+        maskClosable={false}
+        width={500}
+      >
+        {transferProgress && (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <Text strong>
+                Trasferimento {transferProgress.current} di{" "}
+                {transferProgress.total}
+              </Text>
+              <div
+                style={{
+                  width: "100%",
+                  height: "8px",
+                  backgroundColor: "#f0f0f0",
+                  borderRadius: "4px",
+                  marginTop: "8px",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    backgroundColor: "#fa8c16",
+                    borderRadius: "4px",
+                    width: `${
+                      (transferProgress.current / transferProgress.total) * 100
+                    }%`,
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <Text>
+                Trasferendo:{" "}
+                <Text strong>{transferProgress.currentVariant}</Text>
+              </Text>
+            </div>
+
+            {transferProgress.completed.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <Text type="secondary">
+                  Completati ({transferProgress.completed.length}):
+                </Text>
+                <div style={{ marginLeft: 16, marginTop: 4 }}>
+                  {transferProgress.completed.map((variant) => (
+                    <div
+                      key={variant}
+                      style={{ fontSize: "12px", color: "#52c41a" }}
+                    >
+                      ✓ {variant}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {transferProgress.failed.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <Text type="secondary">
+                  Falliti ({transferProgress.failed.length}):
+                </Text>
+                <div style={{ marginLeft: 16, marginTop: 4 }}>
+                  {transferProgress.failed.map((failure) => (
+                    <div
+                      key={failure.variant}
+                      style={{ fontSize: "12px", color: "#f5222d" }}
+                    >
+                      ✗ {failure.variant}: {failure.error}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
 
       {/* Modification History Modal */}
