@@ -856,7 +856,7 @@ const HomePage: React.FC<HomePageProps> = ({
         } else {
           failed.push({
             variant: result.value.variant,
-            error: result.value.error,
+            error: result.value.error || "Errore sconosciuto",
           });
         }
       } else {
