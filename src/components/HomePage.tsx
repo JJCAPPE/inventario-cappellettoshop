@@ -111,6 +111,15 @@ const HomePage: React.FC<HomePageProps> = ({
   );
   const [secondaryPanelExpanded, setSecondaryPanelExpanded] = useState(false);
 
+  // Add state for pending settings changes
+  const [pendingPrimaryLocation, setPendingPrimaryLocation] =
+    useState<LocationName>(LOCATION_CONFIG.defaultPrimary);
+  const [pendingSearchSortKey, setPendingSearchSortKey] =
+    useState<string>("RELEVANCE");
+  const [pendingSearchSortReverse, setPendingSearchSortReverse] =
+    useState<boolean>(false);
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+
   // Legacy variables for backward compatibility
   const negozio = primaryLocation;
   const secondario = secondaryLocation;
@@ -121,6 +130,7 @@ const HomePage: React.FC<HomePageProps> = ({
     if (savedLocation && LOCATION_CONFIG.isValidLocation(savedLocation)) {
       setPrimaryLocation(savedLocation);
       setSecondaryLocation(LOCATION_CONFIG.getSecondaryLocation(savedLocation));
+      setPendingPrimaryLocation(savedLocation); // Initialize pending state
     }
 
     // Load saved search sort preference from localStorage
@@ -132,12 +142,14 @@ const HomePage: React.FC<HomePageProps> = ({
       )
     ) {
       setSearchSortKey(savedSortKey);
+      setPendingSearchSortKey(savedSortKey); // Initialize pending state
     }
 
     // Load saved search sort reverse preference from localStorage
     const savedSortReverse = localStorage.getItem("searchSortReverse");
     if (savedSortReverse !== null) {
       setSearchSortReverse(savedSortReverse === "true");
+      setPendingSearchSortReverse(savedSortReverse === "true"); // Initialize pending state
     }
 
     // Add keyboard shortcut listener for Cmd+, (settings)
@@ -200,53 +212,142 @@ const HomePage: React.FC<HomePageProps> = ({
     }
   }, [triggerSettingsModal, onSettingsTriggered, onSettingsOpen]);
 
-  const handleLocationChange = (newPrimaryLocation: string) => {
-    if (LOCATION_CONFIG.isValidLocation(newPrimaryLocation)) {
-      setPrimaryLocation(newPrimaryLocation);
-      setSecondaryLocation(
-        LOCATION_CONFIG.getSecondaryLocation(newPrimaryLocation)
+  // Reset pending settings when modal opens
+  useEffect(() => {
+    if (settingsModalVisible) {
+      console.log(
+        "⚙️ Settings modal opened - resetting pending values to current values"
       );
+      setPendingPrimaryLocation(primaryLocation);
+      setPendingSearchSortKey(searchSortKey);
+      setPendingSearchSortReverse(searchSortReverse);
+    }
+  }, [settingsModalVisible, primaryLocation, searchSortKey, searchSortReverse]);
 
-      // Save to localStorage
-      localStorage.setItem("primaryLocation", newPrimaryLocation);
-
-      message.success(`Posizione principale cambiata a ${newPrimaryLocation}`);
-    } else {
-      message.error(`Posizione non valida: ${newPrimaryLocation}`);
+  // Update pending settings functions (don't apply immediately)
+  const handlePendingLocationChange = (newPrimaryLocation: string) => {
+    if (LOCATION_CONFIG.isValidLocation(newPrimaryLocation)) {
+      setPendingPrimaryLocation(newPrimaryLocation);
     }
   };
 
-  const handleSearchSortChange = (newSortKey: string) => {
-    setSearchSortKey(newSortKey);
+  const handlePendingSearchSortChange = (newSortKey: string) => {
+    setPendingSearchSortKey(newSortKey);
+  };
 
-    // Save to localStorage
-    localStorage.setItem("searchSortKey", newSortKey);
+  const handlePendingSearchSortReverseChange = (reverse: boolean) => {
+    setPendingSearchSortReverse(reverse);
+  };
 
-    const sortLabels = {
-      RELEVANCE: "Rilevanza",
-      UPDATED_AT: "Aggiornati Recentemente",
-      CREATED_AT: "Creati Recentemente",
-      INVENTORY_TOTAL: "Quantità Totale",
-    };
+  // Function to refresh current product data with new location
+  const refreshProductWithNewLocation = async (
+    newPrimaryLocation: LocationName
+  ) => {
+    if (!productDetails || !lastSelectedQuery) return;
 
-    message.success(
-      `Ordine Risultati Ricerca: ${
-        sortLabels[newSortKey as keyof typeof sortLabels]
-      }`
+    console.log(
+      "🔄 Refreshing product data with new primary location:",
+      newPrimaryLocation
     );
+
+    try {
+      // Re-fetch the product with the new location
+      await handleSearchSelect(productDetails.id, lastSelectedQuery);
+
+      // Validate selected variant for new location
+      setTimeout(() => {
+        if (selectedVariant && productDetails) {
+          const variantObj = productDetails.varaintiArticolo.find(
+            (v) => v.title === selectedVariant
+          );
+
+          if (!variantObj || variantObj.inventory_quantity <= 0) {
+            console.log(
+              `🚫 Clearing selected variant '${selectedVariant}' because it's unavailable in new location`
+            );
+            setSelectedVariant(null);
+            message.warning(
+              `Variante "${selectedVariant}" non disponibile nella nuova posizione`
+            );
+          }
+        }
+      }, 100);
+    } catch (error) {
+      console.error("❌ Error refreshing product with new location:", error);
+      message.error("Errore nell'aggiornamento del prodotto");
+    }
   };
 
-  const handleSearchSortReverseChange = (reverse: boolean) => {
-    setSearchSortReverse(reverse);
+  const handleSettingsOk = async () => {
+    setIsSettingsSaving(true);
 
-    // Save to localStorage
-    localStorage.setItem("searchSortReverse", reverse.toString());
+    try {
+      // Check if location changed
+      const locationChanged = pendingPrimaryLocation !== primaryLocation;
 
-    const orderText = reverse ? "Decrescente" : "Crescente";
-    message.success(`Ordine risultati: ${orderText}`);
+      // Apply all pending changes
+      setPrimaryLocation(pendingPrimaryLocation);
+      setSecondaryLocation(
+        LOCATION_CONFIG.getSecondaryLocation(pendingPrimaryLocation)
+      );
+      setSearchSortKey(pendingSearchSortKey);
+      setSearchSortReverse(pendingSearchSortReverse);
+
+      // Save to localStorage
+      localStorage.setItem("primaryLocation", pendingPrimaryLocation);
+      localStorage.setItem("searchSortKey", pendingSearchSortKey);
+      localStorage.setItem(
+        "searchSortReverse",
+        pendingSearchSortReverse.toString()
+      );
+
+      // Show success messages for what changed
+      if (locationChanged) {
+        message.success(
+          `Posizione principale cambiata a ${pendingPrimaryLocation}`
+        );
+
+        // Refresh product data if location changed and there's a current product
+        if (productDetails) {
+          await refreshProductWithNewLocation(pendingPrimaryLocation);
+        }
+      }
+
+      if (pendingSearchSortKey !== searchSortKey) {
+        const sortLabels = {
+          RELEVANCE: "Rilevanza",
+          UPDATED_AT: "Aggiornati Recentemente",
+          CREATED_AT: "Creati Recentemente",
+          INVENTORY_TOTAL: "Quantità Totale",
+        };
+
+        message.success(
+          `Ordine Risultati Ricerca: ${
+            sortLabels[pendingSearchSortKey as keyof typeof sortLabels]
+          }`
+        );
+      }
+
+      if (pendingSearchSortReverse !== searchSortReverse) {
+        const orderText = pendingSearchSortReverse
+          ? "Decrescente"
+          : "Crescente";
+        message.success(`Ordine risultati: ${orderText}`);
+      }
+    } catch (error) {
+      console.error("❌ Error applying settings:", error);
+      message.error("Errore nell'applicazione delle impostazioni");
+    } finally {
+      setIsSettingsSaving(false);
+      onSettingsClose?.();
+    }
   };
 
-  const handleSettingsOk = () => {
+  const handleSettingsCancel = () => {
+    // Reset pending values to current values
+    setPendingPrimaryLocation(primaryLocation);
+    setPendingSearchSortKey(searchSortKey);
+    setPendingSearchSortReverse(searchSortReverse);
     onSettingsClose?.();
   };
 
@@ -1256,9 +1357,10 @@ const HomePage: React.FC<HomePageProps> = ({
         }
         open={settingsModalVisible}
         onOk={handleSettingsOk}
-        onCancel={() => onSettingsClose?.()}
+        onCancel={handleSettingsCancel}
         okText="Salva"
         cancelText="Annulla"
+        confirmLoading={isSettingsSaving}
         width={500}
       >
         <div style={{ padding: "16px 0" }}>
@@ -1269,8 +1371,8 @@ const HomePage: React.FC<HomePageProps> = ({
           </Text>
 
           <Radio.Group
-            value={primaryLocation}
-            onChange={(e) => handleLocationChange(e.target.value)}
+            value={pendingPrimaryLocation}
+            onChange={(e) => handlePendingLocationChange(e.target.value)}
             style={{ width: "100%" }}
           >
             <Space direction="vertical" style={{ width: "100%" }}>
@@ -1282,12 +1384,12 @@ const HomePage: React.FC<HomePageProps> = ({
                 >
                   <Space>
                     <span>{location}</span>
-                    {primaryLocation === location && (
+                    {pendingPrimaryLocation === location && (
                       <Tag color="blue">Principale</Tag>
                     )}
-                    {secondaryLocation === location && (
-                      <Tag color="default">Secondario</Tag>
-                    )}
+                    {LOCATION_CONFIG.getSecondaryLocation(
+                      pendingPrimaryLocation
+                    ) === location && <Tag color="default">Secondario</Tag>}
                   </Space>
                 </Radio>
               ))}
@@ -1302,8 +1404,8 @@ const HomePage: React.FC<HomePageProps> = ({
           </Text>
 
           <Radio.Group
-            value={searchSortKey}
-            onChange={(e) => handleSearchSortChange(e.target.value)}
+            value={pendingSearchSortKey}
+            onChange={(e) => handlePendingSearchSortChange(e.target.value)}
             style={{ width: "100%" }}
           >
             <Space direction="vertical" style={{ width: "100%" }}>
@@ -1349,8 +1451,8 @@ const HomePage: React.FC<HomePageProps> = ({
                 </Text>
               </div>
               <Switch
-                checked={searchSortReverse}
-                onChange={handleSearchSortReverseChange}
+                checked={pendingSearchSortReverse}
+                onChange={handlePendingSearchSortReverseChange}
                 checkedChildren="↓"
                 unCheckedChildren="↑"
               />
