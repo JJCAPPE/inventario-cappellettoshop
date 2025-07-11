@@ -15,6 +15,7 @@ import {
   Typography,
   Radio,
   Switch,
+  App,
 } from "antd";
 import {
   ReloadOutlined,
@@ -82,6 +83,7 @@ const HomePage: React.FC<HomePageProps> = ({
   onSettingsClose,
 }) => {
   const { fetchLogs } = useLogs();
+  const { modal, message: messageApi } = App.useApp();
   const [query, setQuery] = useState("");
   const [productDetails, setProductDetails] = useState<ProductDetails | null>(
     null
@@ -103,6 +105,7 @@ const HomePage: React.FC<HomePageProps> = ({
     useState(false);
   const [undoTransferModalVisible, setUndoTransferModalVisible] =
     useState(false);
+
   const [modificationHistoryModalVisible, setModificationHistoryModalVisible] =
     useState(false);
   const [checkRequestModalVisible, setCheckRequestModalVisible] =
@@ -126,6 +129,9 @@ const HomePage: React.FC<HomePageProps> = ({
   const [lastTransferredVariants, setLastTransferredVariants] = useState<
     string[]
   >([]); // For batch transfers
+  const [transferFailedVariants, setTransferFailedVariants] = useState<
+    { variant: string; error: string }[]
+  >([]); // For tracking failed transfers
   const [transferProgress, setTransferProgress] = useState<{
     current: number;
     total: number;
@@ -291,12 +297,16 @@ const HomePage: React.FC<HomePageProps> = ({
       localStorage.setItem("primaryLocation", newPrimaryLocation);
 
       // Show success message
-      message.success(`Posizione principale cambiata a ${newPrimaryLocation}`);
+      messageApi.success(
+        `Posizione principale cambiata a ${newPrimaryLocation}`
+      );
 
       // Refresh product data if there's a current product
       if (productDetails) {
         console.log("🔄 Refreshing product data for new location...");
         await refreshProductWithNewLocation(newPrimaryLocation);
+        // Ensure logs are also refreshed for new location
+        await fetchLogs();
       }
       handleReset();
     }
@@ -314,7 +324,7 @@ const HomePage: React.FC<HomePageProps> = ({
       INVENTORY_TOTAL: "Quantità Totale",
     };
 
-    message.success(
+    messageApi.success(
       `Ordine Risultati Ricerca: ${
         sortLabels[newSortKey as keyof typeof sortLabels]
       }`
@@ -327,7 +337,7 @@ const HomePage: React.FC<HomePageProps> = ({
     localStorage.setItem("searchSortReverse", reverse.toString());
 
     const orderText = reverse ? "Decrescente" : "Crescente";
-    message.success(`Ordine risultati: ${orderText}`);
+    messageApi.success(`Ordine risultati: ${orderText}`);
   };
 
   const handleTransferModeChange = (enabled: boolean) => {
@@ -336,7 +346,7 @@ const HomePage: React.FC<HomePageProps> = ({
     localStorage.setItem("transferModeEnabled", enabled.toString());
 
     const statusText = enabled ? "attivata" : "disattivata";
-    message.success(`Modalità Trasferimenti ${statusText}`);
+    messageApi.success(`Modalità Trasferimenti ${statusText}`);
   };
 
   // Function to refresh current product data with new location
@@ -366,7 +376,7 @@ const HomePage: React.FC<HomePageProps> = ({
               `🚫 Clearing selected variant '${selectedVariant}' because it's unavailable in new location`
             );
             setSelectedVariant(null);
-            message.warning(
+            messageApi.warning(
               `Variante "${selectedVariant}" non disponibile nella nuova posizione`
             );
           }
@@ -374,7 +384,7 @@ const HomePage: React.FC<HomePageProps> = ({
       }, 100);
     } catch (error) {
       console.error("❌ Error refreshing product with new location:", error);
-      message.error("Errore nell'aggiornamento del prodotto");
+      messageApi.error("Errore nell'aggiornamento del prodotto");
     }
   };
 
@@ -510,7 +520,7 @@ const HomePage: React.FC<HomePageProps> = ({
       }
     } catch (error) {
       console.error("❌ HomePage: Error fetching product:", error);
-      message.error("Prodotto non trovato, prova un altro barcode");
+      messageApi.error("Prodotto non trovato, prova un altro barcode");
     }
   };
 
@@ -521,7 +531,7 @@ const HomePage: React.FC<HomePageProps> = ({
     );
 
     if (variantObj && variantObj.inventory_quantity < 0) {
-      message.warning(
+      messageApi.warning(
         `La taglia ${variant} ha quantità negativa. Non è possibile selezionarla.`
       );
       return;
@@ -539,7 +549,7 @@ const HomePage: React.FC<HomePageProps> = ({
     );
 
     if (variantObj && variantObj.inventory_quantity <= 0) {
-      message.warning(
+      messageApi.warning(
         `La taglia ${variant} non ha inventario disponibile. Non è possibile selezionarla per il trasferimento.`
       );
       return;
@@ -607,17 +617,27 @@ const HomePage: React.FC<HomePageProps> = ({
     return searchHistory[newIndex] || null;
   };
 
-  // Batch transfer function for multiple variants
+  // Batch transfer function for multiple variants with concurrent processing
   const executeBatchTransfer = async (variantNames: string[]) => {
+    console.log("🔄 Starting batch transfer execution", {
+      variantCount: variantNames.length,
+      variants: variantNames,
+      productId: productDetails?.id,
+      productName: productDetails?.nomeArticolo,
+      fromLocation: primaryLocation,
+      toLocation: secondaryLocation,
+    });
+
     if (!productDetails) {
-      throw new Error("Dettagli prodotto non disponibili");
+      const error = "Dettagli prodotto non disponibili";
+      console.error("❌ Batch transfer failed:", error);
+      throw new Error(error);
     }
 
-    const completed: string[] = [];
-    const failed: { variant: string; error: string }[] = [];
-
     // Get location configuration once
+    console.log("📍 Fetching location configuration...");
     const locationConfig = await TauriAPI.Inventory.getLocationConfig();
+    console.log("📍 Location configuration received:", locationConfig);
 
     const fromLocationId =
       primaryLocation === LOCATION_CONFIG.availableLocations[0]
@@ -629,76 +649,242 @@ const HomePage: React.FC<HomePageProps> = ({
         ? locationConfig.primary_location.id
         : locationConfig.secondary_location.id;
 
-    // Process each variant sequentially
-    for (let i = 0; i < variantNames.length; i++) {
-      const variantName = variantNames[i];
+    console.log("📍 Location mapping:", {
+      primaryLocation,
+      secondaryLocation,
+      fromLocationId,
+      toLocationId,
+      availableLocations: LOCATION_CONFIG.availableLocations,
+    });
 
-      // Update progress
-      setTransferProgress({
-        current: i + 1,
-        total: variantNames.length,
-        currentVariant: variantName,
-        completed: [...completed],
-        failed: [...failed],
+    // Pre-validate all variants before starting transfers
+    const validatedVariants: Array<{
+      name: string;
+      variant: {
+        variant_id: string;
+        inventory_item_id: string;
+        title: string;
+        inventory_quantity: number;
+      };
+    }> = [];
+    for (const variantName of variantNames) {
+      const variant = productDetails.varaintiArticolo.find(
+        (v) => v.title === variantName
+      );
+
+      if (!variant) {
+        console.error(
+          `❌ Variant not found in product details: ${variantName}`
+        );
+        continue;
+      }
+
+      if (!variant.inventory_item_id) {
+        console.error(
+          `❌ Missing inventory_item_id for variant: ${variantName}`
+        );
+        continue;
+      }
+
+      if (variant.inventory_quantity <= 0) {
+        console.error(`❌ No inventory available for variant: ${variantName}`);
+        continue;
+      }
+
+      validatedVariants.push({
+        name: variantName,
+        variant: variant,
       });
+    }
 
-      try {
-        console.log(
-          `🔄 [${i + 1}/${
-            variantNames.length
-          }] Transferring variant: ${variantName}`
-        );
+    console.log(
+      `✅ Validated ${validatedVariants.length}/${variantNames.length} variants for transfer`
+    );
 
-        // Find variant details
-        const variant = productDetails.varaintiArticolo.find(
-          (v) => v.title === variantName
-        );
+    if (validatedVariants.length === 0) {
+      throw new Error("Nessuna variante valida per il trasferimento");
+    }
 
-        if (!variant) {
-          throw new Error(`Variante ${variantName} non trovata`);
-        }
+    // Set initial progress
+    setTransferProgress({
+      current: 0,
+      total: validatedVariants.length,
+      currentVariant: "Inizializzazione...",
+      completed: [],
+      failed: [],
+    });
 
-        if (variant.inventory_quantity <= 0) {
-          throw new Error(`Nessun inventario disponibile per ${variantName}`);
-        }
-
-        // Execute the transfer
-        const result =
-          await TauriAPI.Inventory.transferInventoryBetweenLocations(
-            variant.inventory_item_id,
-            fromLocationId,
-            toLocationId,
-            productDetails.id,
-            variantName,
-            productDetails.nomeArticolo,
-            productDetails.prezzo,
-            primaryLocation,
-            secondaryLocation,
-            productDetails.immaginiArticolo
+    // Execute transfers with concurrent processing
+    const transferPromises = validatedVariants.map(
+      async ({ name: variantName, variant }, index) => {
+        try {
+          console.log(
+            `🚀 [${index + 1}/${
+              validatedVariants.length
+            }] Starting concurrent transfer for: ${variantName}`
           );
 
-        console.log(
-          `✅ [${i + 1}/${
-            variantNames.length
-          }] Transfer successful for ${variantName}:`,
-          result
-        );
-        completed.push(variantName);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Errore sconosciuto";
-        console.error(
-          `❌ [${i + 1}/${
-            variantNames.length
-          }] Transfer failed for ${variantName}:`,
-          errorMessage
-        );
-        failed.push({ variant: variantName, error: errorMessage });
+          // Refresh product data to get latest inventory before transfer
+          console.log(
+            `🔄 [${index + 1}/${
+              validatedVariants.length
+            }] Refreshing inventory data for ${variantName}...`
+          );
+          const freshProduct = await TauriAPI.Product.getProductById(
+            productDetails.id
+          );
+          const freshVariant = freshProduct.variants.find(
+            (v) => v.inventory_item_id === variant.inventory_item_id
+          );
+
+          if (!freshVariant) {
+            throw new Error(
+              `Variante "${variantName}" non trovata nei dati aggiornati`
+            );
+          }
+
+          // Get fresh inventory levels
+          const freshInventory =
+            await TauriAPI.Inventory.getInventoryLevelsForLocations(
+              [freshVariant.inventory_item_id],
+              primaryLocation
+            );
+
+          const currentInventory =
+            freshInventory[freshVariant.inventory_item_id]?.primary || 0;
+
+          if (currentInventory <= 0) {
+            throw new Error(
+              `Inventario insufficiente per "${variantName}" (corrente: ${currentInventory})`
+            );
+          }
+
+          console.log(
+            `📦 [${index + 1}/${
+              validatedVariants.length
+            }] Fresh inventory check passed for ${variantName}: ${currentInventory}`
+          );
+
+          // Execute the transfer
+          const result =
+            await TauriAPI.Inventory.transferInventoryBetweenLocations(
+              variant.inventory_item_id,
+              fromLocationId,
+              toLocationId,
+              productDetails.id,
+              variantName,
+              productDetails.nomeArticolo,
+              productDetails.prezzo,
+              primaryLocation,
+              secondaryLocation,
+              productDetails.immaginiArticolo
+            );
+
+          console.log(
+            `✅ [${index + 1}/${
+              validatedVariants.length
+            }] Concurrent transfer successful for ${variantName}:`,
+            result
+          );
+
+          // Update progress
+          setTransferProgress((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  current: prev.current + 1,
+                  completed: [...prev.completed, variantName],
+                }
+              : null
+          );
+
+          return { success: true, variant: variantName, result };
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Errore sconosciuto";
+
+          console.error(
+            `❌ [${index + 1}/${
+              validatedVariants.length
+            }] Concurrent transfer failed for ${variantName}:`,
+            {
+              error,
+              errorMessage,
+              variantName,
+              inventory_item_id: variant.inventory_item_id,
+            }
+          );
+
+          // Create detailed error message
+          let detailedError = errorMessage;
+          if (errorMessage.includes("Not Found")) {
+            detailedError = `Variante "${variantName}" non trovata nel sistema inventario (possibile inconsistenza dati)`;
+          } else if (errorMessage.includes("Failed to adjust inventory")) {
+            detailedError = `Impossibile aggiornare inventario per "${variantName}" (controllo permessi o rate limit)`;
+          } else if (errorMessage.includes("Inventario insufficiente")) {
+            detailedError = errorMessage; // Keep the detailed inventory message
+          }
+
+          // Update progress
+          setTransferProgress((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  current: prev.current + 1,
+                  failed: [
+                    ...prev.failed,
+                    { variant: variantName, error: detailedError },
+                  ],
+                }
+              : null
+          );
+
+          return { success: false, variant: variantName, error: detailedError };
+        }
       }
-    }
+    );
+
+    // Wait for all transfers to complete
+    console.log("⏳ Waiting for all concurrent transfers to complete...");
+    const results = await Promise.allSettled(transferPromises);
+
+    // Process results
+    const completed: string[] = [];
+    const failed: { variant: string; error: string }[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        if (result.value.success) {
+          completed.push(result.value.variant);
+        } else {
+          failed.push({
+            variant: result.value.variant,
+            error: result.value.error,
+          });
+        }
+      } else {
+        const variantName = `Unknown-${index}`;
+        failed.push({
+          variant: variantName,
+          error: `Errore di promise: ${result.reason}`,
+        });
+      }
+    });
 
     // Clear progress state
     setTransferProgress(null);
+
+    // Log final batch results
+    console.log("📊 Concurrent batch transfer completed:", {
+      totalVariants: validatedVariants.length,
+      completed: completed.length,
+      failed: failed.length,
+      completedVariants: completed,
+      failedVariants: failed.map((f) => ({
+        variant: f.variant,
+        error: f.error,
+      })),
+    });
 
     return { completed, failed };
   };
@@ -712,19 +898,19 @@ const HomePage: React.FC<HomePageProps> = ({
     );
 
     if (!variant) {
-      message.error("Variante non trovata");
+      messageApi.error("Variante non trovata");
       return;
     }
 
     if (variant.inventory_quantity <= 0) {
       const quantityText = variant.inventory_quantity === 0 ? "0" : "negativa";
-      message.warning(
+      messageApi.warning(
         `La taglia ${selectedVariant} ha già quantità ${quantityText}. Non è possibile ridurla ulteriormente.`
       );
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: "Conferma Modifica",
       icon: <ExclamationCircleOutlined />,
       content: `Sei sicuro di voler rimuovere la taglia ${selectedVariant} dell'articolo ${productDetails.nomeArticolo}?`,
@@ -780,6 +966,9 @@ const HomePage: React.FC<HomePageProps> = ({
           );
           console.log("✅ Inventory adjustment successful:", result);
 
+          // Always refresh logs and product data after modification
+          await fetchLogs();
+
           // Refresh product data to show updated inventory
           console.log("🔄 Refreshing product data...");
           await handleSearchSelect(
@@ -794,13 +983,13 @@ const HomePage: React.FC<HomePageProps> = ({
           setModifyModalVisible(true);
 
           // Show enhanced success message
-          message.success({
+          messageApi.success({
             content: result.message,
             duration: 4,
           });
         } catch (error) {
           console.error("❌ Error decreasing inventory:", error);
-          message.error(
+          messageApi.error(
             `Errore nella modifica del prodotto: ${
               error instanceof Error ? error.message : "Errore sconosciuto"
             }`
@@ -883,13 +1072,13 @@ const HomePage: React.FC<HomePageProps> = ({
       setUndoModalVisible(true);
 
       // Show enhanced success message
-      message.success({
+      messageApi.success({
         content: result.message,
         duration: 4,
       });
     } catch (error) {
       console.error("❌ Error undoing change:", error);
-      message.error(
+      messageApi.error(
         `Errore nell'annullamento: ${
           error instanceof Error ? error.message : "Errore sconosciuto"
         }`
@@ -907,7 +1096,7 @@ const HomePage: React.FC<HomePageProps> = ({
         await openUrl(url);
       } catch (error) {
         console.error("Failed to open Shopify admin:", error);
-        message.error("Impossibile aprire il link di Shopify");
+        messageApi.error("Impossibile aprire il link di Shopify");
       }
     }
   };
@@ -920,7 +1109,7 @@ const HomePage: React.FC<HomePageProps> = ({
         await openUrl(url);
       } catch (error) {
         console.error("Failed to open online shop:", error);
-        message.error("Impossibile aprire il link del negozio online");
+        messageApi.error("Impossibile aprire il link del negozio online");
       }
     }
   };
@@ -929,7 +1118,7 @@ const HomePage: React.FC<HomePageProps> = ({
     if (productDetails) {
       setModificationHistoryModalVisible(true);
     } else {
-      message.warning(
+      messageApi.warning(
         "Seleziona prima un prodotto per visualizzare la cronologia modifiche"
       );
     }
@@ -939,7 +1128,7 @@ const HomePage: React.FC<HomePageProps> = ({
     if (productDetails) {
       setCheckRequestModalVisible(true);
     } else {
-      message.warning(
+      messageApi.warning(
         "Seleziona prima un prodotto per creare una richiesta di controllo"
       );
     }
@@ -971,12 +1160,12 @@ const HomePage: React.FC<HomePageProps> = ({
         );
 
         if (!variant) {
-          message.error(`Variante ${variantName} non trovata`);
+          messageApi.error(`Variante ${variantName} non trovata`);
           return null;
         }
 
         if (variant.inventory_quantity <= 0) {
-          message.warning(
+          messageApi.warning(
             `La taglia ${variantName} non ha inventario a ${primaryLocation}. Non è possibile trasferire.`
           );
           return null;
@@ -991,13 +1180,13 @@ const HomePage: React.FC<HomePageProps> = ({
     }
 
     if (variantDetails.length !== variantsToTransfer.length) {
-      message.error(
+      messageApi.error(
         "Alcune varianti selezionate non sono disponibili per il trasferimento"
       );
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: isMultiple
         ? "Conferma Trasferimento Multiplo"
         : "Conferma Trasferimento",
@@ -1060,6 +1249,17 @@ const HomePage: React.FC<HomePageProps> = ({
       onOk: async () => {
         setIsTransferLoading(true);
         try {
+          console.log("🚀 Transfer operation initiated:", {
+            type: isMultiple ? "batch" : "single",
+            variantCount: variantsToTransfer.length,
+            variants: variantsToTransfer,
+            fromLocation: primaryLocation,
+            toLocation: secondaryLocation,
+            productId: productDetails.id,
+            productName: productDetails.nomeArticolo,
+            timestamp: new Date().toISOString(),
+          });
+
           console.log(
             `🔄 Starting ${
               isMultiple ? "batch" : "single"
@@ -1071,29 +1271,68 @@ const HomePage: React.FC<HomePageProps> = ({
           let result;
           if (isMultiple) {
             // Execute batch transfer
+            console.log("🔄 Starting batch transfer from main function:", {
+              variantsToTransfer,
+              count: variantsToTransfer.length,
+              productId: productDetails.id,
+              productName: productDetails.nomeArticolo,
+            });
             const batchResult = await executeBatchTransfer(variantsToTransfer);
+            console.log("📋 Batch transfer result received:", batchResult);
 
-            if (batchResult.failed.length > 0) {
-              // Some transfers failed
-              const failedVariants = batchResult.failed
-                .map((f) => f.variant)
-                .join(", ");
-              throw new Error(`Trasferimenti falliti per: ${failedVariants}`);
-            }
-
-            // All transfers succeeded
+            // Store results for modal display
             setLastTransferredVariants(batchResult.completed);
-            result = {
-              message: `Trasferiti ${batchResult.completed.length} varianti da ${primaryLocation} a ${secondaryLocation}`,
-            };
+
+            // Store failed transfers for modal display
+            setTransferFailedVariants(batchResult.failed);
+
+            if (
+              batchResult.failed.length > 0 &&
+              batchResult.completed.length === 0
+            ) {
+              // All transfers failed - still show modal but with error focus
+              result = {
+                message: `Nessun trasferimento completato (${batchResult.failed.length} falliti)`,
+              };
+            } else if (batchResult.failed.length > 0) {
+              // Partial success
+              result = {
+                message: `Trasferiti ${batchResult.completed.length}/${variantsToTransfer.length} varianti da ${primaryLocation} a ${secondaryLocation}`,
+              };
+            } else {
+              // All transfers succeeded
+              result = {
+                message: `Trasferiti ${batchResult.completed.length} varianti da ${primaryLocation} a ${secondaryLocation}`,
+              };
+            }
           } else {
             // Execute single transfer (existing logic)
             const variantName = variantsToTransfer[0];
+            console.log("🔄 Processing single transfer:", {
+              variantName,
+              availableVariants: productDetails.varaintiArticolo.map(
+                (v) => v.title
+              ),
+            });
+
             const variant = productDetails.varaintiArticolo.find(
               (v) => v.title === variantName
             );
 
+            console.log("📦 Single variant lookup result:", {
+              variantName,
+              found: !!variant,
+              variantDetails: variant,
+            });
+
             if (!variant) {
+              console.error("❌ Single transfer - variant not found:", {
+                searchedVariant: variantName,
+                availableVariants: productDetails.varaintiArticolo.map((v) => ({
+                  title: v.title,
+                  inventory_item_id: v.inventory_item_id,
+                })),
+              });
               throw new Error("Variante non trovata");
             }
 
@@ -1119,6 +1358,18 @@ const HomePage: React.FC<HomePageProps> = ({
               toLocationId
             );
 
+            console.log("📡 Making single transfer API call:", {
+              inventory_item_id: variant.inventory_item_id,
+              fromLocationId,
+              toLocationId,
+              productId: productDetails.id,
+              variantName,
+              productName: productDetails.nomeArticolo,
+              price: productDetails.prezzo,
+              primaryLocation,
+              secondaryLocation,
+            });
+
             // Execute the transfer via the backend API
             result = await TauriAPI.Inventory.transferInventoryBetweenLocations(
               variant.inventory_item_id,
@@ -1135,9 +1386,17 @@ const HomePage: React.FC<HomePageProps> = ({
 
             // Store the transferred variant for potential undo operation
             setLastTransferredVariant(variantName);
+
+            console.log("✅ Single transfer API call successful:", {
+              variantName,
+              result,
+            });
           }
 
           console.log("✅ Inventory transfer successful:", result);
+
+          // Always refresh logs and product data after any transfer operation
+          await fetchLogs();
 
           // Refresh product data to show updated inventory
           console.log("🔄 Refreshing product data...");
@@ -1149,18 +1408,32 @@ const HomePage: React.FC<HomePageProps> = ({
           // Show transfer success modal
           setTransferSuccessModalVisible(true);
 
-          // Show enhanced success message
-          message.success({
-            content: result.message,
-            duration: 4,
-          });
+          // Remove redundant success message - details shown in modal
         } catch (error) {
           console.error("❌ Error transferring inventory:", error);
-          message.error(
-            `Errore nel trasferimento: ${
-              error instanceof Error ? error.message : "Errore sconosciuto"
-            }`
-          );
+
+          // If any transfers succeeded (in case of unexpected errors after partial completion),
+          // still refresh the data
+          if (lastTransferredVariants.length > 0) {
+            console.log(
+              "🔄 Refreshing data due to partial transfers before error..."
+            );
+            try {
+              await fetchLogs();
+              await handleSearchSelect(
+                productDetails.id,
+                lastSelectedQuery || productDetails.nomeArticolo
+              );
+            } catch (refreshError) {
+              console.error(
+                "❌ Error refreshing after partial transfer:",
+                refreshError
+              );
+            }
+          }
+
+          // Remove redundant error message - errors shown in modal
+          console.error("Transfer operation failed:", error);
         } finally {
           setIsTransferLoading(false);
         }
@@ -1263,13 +1536,13 @@ const HomePage: React.FC<HomePageProps> = ({
       setUndoTransferModalVisible(true);
 
       // Show enhanced success message
-      message.success({
+      messageApi.success({
         content: result.message,
         duration: 4,
       });
     } catch (error) {
       console.error("❌ Error undoing transfer:", error);
-      message.error(
+      messageApi.error(
         `Errore nell'annullamento del trasferimento: ${
           error instanceof Error ? error.message : "Errore sconosciuto"
         }`
@@ -1277,6 +1550,55 @@ const HomePage: React.FC<HomePageProps> = ({
     } finally {
       console.log("✅ Setting transfer loading to false");
       setIsTransferLoading(false);
+    }
+  };
+
+  // Handler for closing product-related modals while keeping product displayed and refreshed
+  const handleProductModalClose = async (
+    modalType: "transfer" | "modify" | "undo" | "undoTransfer"
+  ) => {
+    console.log(`🔄 Closing ${modalType} modal and refreshing product data...`);
+
+    // Close the appropriate modal
+    switch (modalType) {
+      case "transfer":
+        setTransferSuccessModalVisible(false);
+        setLastTransferredVariant(null);
+        setLastTransferredVariants([]);
+        setTransferFailedVariants([]);
+        break;
+      case "modify":
+        setModifyModalVisible(false);
+        setLastModifiedVariant(null);
+        break;
+      case "undo":
+        setUndoModalVisible(false);
+        setLastModifiedVariant(null);
+        break;
+      case "undoTransfer":
+        setUndoTransferModalVisible(false);
+        setLastTransferredVariant(null);
+        setLastTransferredVariants([]);
+        break;
+    }
+
+    // Clear selections and loading states
+    setSelectedVariant(null);
+    setSelectedVariants([]);
+    setIsTransferLoading(false);
+    setIsModifyLoading(false);
+    setIsUndoLoading(false);
+
+    // Refresh the current product data if we have one
+    if (productDetails && lastSelectedQuery) {
+      try {
+        console.log("🔄 Refreshing current product data...");
+        await handleSearchSelect(productDetails.id, lastSelectedQuery);
+        console.log("✅ Product data refreshed successfully");
+      } catch (error) {
+        console.error("❌ Error refreshing product data:", error);
+        messageApi.error("Errore nel refresh del prodotto");
+      }
     }
   };
 
@@ -1299,6 +1621,7 @@ const HomePage: React.FC<HomePageProps> = ({
     setLastModifiedVariant(null);
     setLastTransferredVariant(null);
     setLastTransferredVariants([]);
+    setTransferFailedVariants([]); // Clear failed transfer variants
     setTransferProgress(null);
     // Reset search history navigation
     setHistoryIndex(-1);
@@ -1496,7 +1819,7 @@ const HomePage: React.FC<HomePageProps> = ({
                             <div
                               style={{ display: "flex", alignItems: "center" }}
                             >
-                              {transferModeEnabled && (
+                              {transferModeEnabled && !isOutOfStock && (
                                 <input
                                   type="checkbox"
                                   checked={selectedVariants.includes(
@@ -1516,6 +1839,10 @@ const HomePage: React.FC<HomePageProps> = ({
                                     ? "line-through"
                                     : "none",
                                   fontSize: "14px",
+                                  marginLeft:
+                                    transferModeEnabled && isOutOfStock
+                                      ? "24px"
+                                      : "0", // Align with checkbox spacing
                                 }}
                               >
                                 {variant.title}
@@ -1893,7 +2220,10 @@ const HomePage: React.FC<HomePageProps> = ({
             >
               Annulla Operazione
             </Button>
-            <Button icon={<CloseOutlined />} onClick={handleReset}>
+            <Button
+              icon={<CloseOutlined />}
+              onClick={() => handleProductModalClose("modify")}
+            >
               Chiudi
             </Button>
           </Space>
@@ -1913,7 +2243,11 @@ const HomePage: React.FC<HomePageProps> = ({
             <Text strong>{productDetails?.nomeArticolo}</Text> è stata
             re-inserita
           </p>
-          <Button type="primary" icon={<CloseOutlined />} onClick={handleReset}>
+          <Button
+            type="primary"
+            icon={<CloseOutlined />}
+            onClick={() => handleProductModalClose("undo")}
+          >
             Chiudi
           </Button>
         </div>
@@ -1922,22 +2256,49 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Transfer Success Modal */}
       <Modal
         title={
-          lastTransferredVariants.length > 0
+          transferFailedVariants.length > 0
+            ? `Trasferimenti ${
+                lastTransferredVariants.length > 0 ? "Parzialmente " : ""
+              }Completati`
+            : lastTransferredVariants.length > 1
             ? "Trasferimenti Effettuati"
             : "Trasferimento Effettuato"
         }
         open={transferSuccessModalVisible}
         footer={null}
         closable={false}
+        width={transferFailedVariants.length > 0 ? 650 : 520}
       >
         <div style={{ textAlign: "center" }}>
-          {lastTransferredVariants.length > 0 ? (
-            // Batch transfer success
-            <div>
+          {/* Success Section */}
+          {lastTransferredVariants.length > 0 && (
+            <div
+              style={{
+                marginBottom: transferFailedVariants.length > 0 ? 20 : 0,
+              }}
+            >
+              <p
+                style={{
+                  color: "#52c41a",
+                  fontWeight: "bold",
+                  marginBottom: 12,
+                }}
+              >
+                ✅{" "}
+                {lastTransferredVariants.length > 1
+                  ? "Trasferimenti Riusciti"
+                  : "Trasferimento Riuscito"}
+              </p>
               <p>
-                <Text strong>{lastTransferredVariants.length} varianti</Text>{" "}
+                <Text strong>
+                  {lastTransferredVariants.length} variante
+                  {lastTransferredVariants.length > 1 ? "i" : ""}
+                </Text>{" "}
                 dell'articolo <Text strong>{productDetails?.nomeArticolo}</Text>{" "}
-                sono state trasferite da <Text strong>{primaryLocation}</Text> a{" "}
+                {lastTransferredVariants.length > 1
+                  ? "sono state trasferite"
+                  : "è stata trasferita"}{" "}
+                da <Text strong>{primaryLocation}</Text> a{" "}
                 <Text strong>{secondaryLocation}</Text>
               </p>
               <div
@@ -1946,6 +2307,7 @@ const HomePage: React.FC<HomePageProps> = ({
                   padding: 12,
                   backgroundColor: "#f6ffed",
                   borderRadius: 6,
+                  border: "1px solid #b7eb8f",
                 }}
               >
                 <Text strong>Varianti trasferite:</Text>
@@ -1958,36 +2320,97 @@ const HomePage: React.FC<HomePageProps> = ({
                 </div>
               </div>
             </div>
-          ) : (
-            // Single transfer success
-            <p>
-              Taglia <Text strong>{lastTransferredVariant}</Text> dell'articolo{" "}
-              <Text strong>{productDetails?.nomeArticolo}</Text> è stata
-              trasferita da <Text strong>{primaryLocation}</Text> a{" "}
-              <Text strong>{secondaryLocation}</Text>
-            </p>
           )}
 
+          {/* Failure Section */}
+          {transferFailedVariants.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <p
+                style={{
+                  color: "#ff4d4f",
+                  fontWeight: "bold",
+                  marginBottom: 12,
+                }}
+              >
+                ❌ Trasferimenti Falliti
+              </p>
+              <div
+                style={{
+                  padding: 12,
+                  backgroundColor: "#fff2f0",
+                  borderRadius: 6,
+                  border: "1px solid #ffccc7",
+                  textAlign: "left",
+                }}
+              >
+                <Text strong>Varianti non trasferite:</Text>
+                <div style={{ marginTop: 8 }}>
+                  {transferFailedVariants.map((failure) => (
+                    <div key={failure.variant} style={{ marginBottom: 8 }}>
+                      <Tag color="red" style={{ marginBottom: 4 }}>
+                        {failure.variant}
+                      </Tag>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#666",
+                          marginLeft: 4,
+                        }}
+                      >
+                        {failure.error}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Summary */}
+          {transferFailedVariants.length > 0 &&
+            lastTransferredVariants.length > 0 && (
+              <div
+                style={{
+                  padding: "12px",
+                  backgroundColor: "#fff7e6",
+                  borderRadius: "6px",
+                  border: "1px solid #ffd591",
+                  marginBottom: 16,
+                }}
+              >
+                <Text strong>
+                  Riepilogo: {lastTransferredVariants.length} riusciti,{" "}
+                  {transferFailedVariants.length} falliti
+                </Text>
+              </div>
+            )}
+
           <Space style={{ marginTop: 16 }}>
+            {lastTransferredVariants.length > 0 && (
+              <Button
+                type="primary"
+                icon={<UndoOutlined />}
+                onClick={() => {
+                  console.log("🖱️ Annulla Trasferimento button clicked!");
+                  handleUndoTransfer();
+                }}
+                loading={isTransferLoading}
+                style={{
+                  backgroundColor: "#fa8c16",
+                  borderColor: "#fa8c16",
+                }}
+              >
+                Annulla{" "}
+                {lastTransferredVariants.length > 1
+                  ? "Trasferimenti"
+                  : "Trasferimento"}
+              </Button>
+            )}
             <Button
-              type="primary"
-              icon={<UndoOutlined />}
-              onClick={() => {
-                console.log("🖱️ Annulla Trasferimento button clicked!");
-                handleUndoTransfer();
-              }}
-              loading={isTransferLoading}
-              style={{
-                backgroundColor: "#fa8c16",
-                borderColor: "#fa8c16",
-              }}
+              type={lastTransferredVariants.length > 0 ? "default" : "primary"}
+              icon={<CloseOutlined />}
+              onClick={() => handleProductModalClose("transfer")}
             >
-              Annulla{" "}
-              {lastTransferredVariants.length > 0
-                ? "Trasferimenti"
-                : "Trasferimento"}
-            </Button>
-            <Button icon={<CloseOutlined />} onClick={handleReset}>
               Chiudi
             </Button>
           </Space>
@@ -2008,7 +2431,11 @@ const HomePage: React.FC<HomePageProps> = ({
             ri-trasferita da <Text strong>{secondaryLocation}</Text> a{" "}
             <Text strong>{primaryLocation}</Text>
           </p>
-          <Button type="primary" icon={<CloseOutlined />} onClick={handleReset}>
+          <Button
+            type="primary"
+            icon={<CloseOutlined />}
+            onClick={() => handleProductModalClose("undoTransfer")}
+          >
             Chiudi
           </Button>
         </div>
@@ -2022,6 +2449,8 @@ const HomePage: React.FC<HomePageProps> = ({
         closable={false}
         maskClosable={false}
         width={500}
+        zIndex={9999}
+        style={{ zIndex: 9999 }}
       >
         {transferProgress && (
           <div>

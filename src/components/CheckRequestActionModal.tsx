@@ -177,7 +177,7 @@ const CheckRequestActionModal: React.FC<CheckRequestActionModalProps> = ({
         </Button>,
       ]}
       width={600}
-      destroyOnClose
+      destroyOnHidden
     >
       {/* Request Details */}
       <div style={{ marginBottom: 24 }}>
